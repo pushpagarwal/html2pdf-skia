@@ -69,6 +69,7 @@
     "prepare": "if [ \"$SKIP_PREPARE\" != \"true\" ]; then husky install; fi"
   },
   "dependencies": {
+    "canvaskit-wasm": "^0.40.0",
     "css-line-break": "^2.1.0",
     "text-segmentation": "^1.0.3"
   },
