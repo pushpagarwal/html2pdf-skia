@@ -9,7 +9,7 @@ import {
     Font as SkiaFont,
     Typeface,
     FontStyle,
-    TypefaceFontProvider
+    FontMgr
 } from 'canvaskit-wasm';
 
 import {ElementPaint, parseStackingContexts, StackingContext} from '../stacking-context';
@@ -51,13 +51,16 @@ import {TextareaElementContainer} from '../../dom/elements/textarea-element-cont
 import {SelectElementContainer} from '../../dom/elements/select-element-container';
 import {IFrameElementContainer} from '../../dom/replaced-elements/iframe-element-container';
 import {TextShadow} from '../../css/property-descriptors/text-shadow';
-import {Renderer} from '../renderer';
-import {Context} from '../../core/context';
+import { Context } from '../../core/context';
 
+export interface CanvasKitConfig {
+    canvasKit: CanvasKit;
+    canvas: SkiaCanvas;
+    fontProvider: FontMgr;
+}
 
 export interface SkiaRenderOptions {
     scale: number;
-    canvas: SkiaCanvas;
     x: number;
     y: number;
     width: number;
@@ -99,25 +102,22 @@ class GlobalAlpha {
     }
 }
 
-export class SkiaRenderer extends Renderer {
+export class SkiaRenderer  {
     canvas: SkiaCanvas;
     canvasKit: CanvasKit;
     private readonly _activeEffects: IElementEffect[] = [];
     private readonly fontMetrics: FontMetrics;
-    private readonly fontProvider: TypefaceFontProvider;
+    private readonly fontProvider: FontMgr;
     private readonly globalAlpha: GlobalAlpha = new GlobalAlpha();
 
-    constructor(context: Context, options: SkiaRenderConfigurations, canvasKit: CanvasKit, fontProvider?: TypefaceFontProvider) {
-        super(context, options as any); // Cast to satisfy parent constructor
-        this.canvas = options.canvas;
-        this.canvasKit = canvasKit;
+    constructor(private context:Context, ckConfig: CanvasKitConfig, private options: SkiaRenderConfigurations) {
+        this.canvas = ckConfig.canvas;
+        this.canvasKit = ckConfig.canvasKit;
         this.fontMetrics = new FontMetrics(document);
-        this.fontProvider = fontProvider || canvasKit.TypefaceFontProvider.Make();
-        
+        this.fontProvider = ckConfig.fontProvider;
         this.canvas.scale(options.scale, options.scale);
         this.canvas.translate(-options.x, -options.y);
         this._activeEffects = [];
-        
         this.context.logger.debug(
             `Skia renderer initialized (${options.width}x${options.height}) with scale ${options.scale}`
         );
@@ -355,7 +355,7 @@ export class SkiaRenderer extends Renderer {
         
         // Try to get a typeface for each font family until one is found
         let typeface: Typeface | null = null;
-        for (const family of [...fontInfo.fontFamily, 'default-font']) {
+        for (const family of [...fontInfo.fontFamily, 'Roboto']) {
             try {
                 typeface = this.fontProvider.matchFamilyStyle(family, fontInfo.fontStyle);
                 if (typeface) {
@@ -366,7 +366,7 @@ export class SkiaRenderer extends Renderer {
                 continue;
             }
         }
-        
+
         // Set the typeface if found
         if (typeface) {
             font.setTypeface(typeface);
@@ -586,14 +586,17 @@ export class SkiaRenderer extends Renderer {
             
             // Create a new SkiaRenderer for the iframe content
             const iframeRenderer = new SkiaRenderer(this.context, {
+                canvasKit: this.canvasKit,
+                canvas: iframeCanvas,
+                fontProvider: this.fontProvider
+            }, {
                 scale: (this.options as any).scale,
                 backgroundColor: container.backgroundColor,
-                canvas: iframeCanvas,
                 x: 0,
                 y: 0,
                 width: container.width,
                 height: container.height
-            }, this.canvasKit, this.fontProvider);
+            });
 
             // Render the iframe content to the recorded canvas
             await iframeRenderer.render(container.tree);
