@@ -1,0 +1,83 @@
+{
+  "name": "html2pdf-skia",
+  "description": "Screenshots with JavaScript. Next generation!",
+  "main": "dist/html2pdf-skia.cjs.js",
+  "module": "dist/html2pdf-skia.esm.js",
+  "typings": "dist/types/index.d.ts",
+  "browser": "dist/html2pdf-skia.js",
+  "version": "0.0.1",
+  "author": {
+    "name": "pushpagarwal",
+    "email": "pushp.agarwal@gmail.com",
+    "url": "https://github.com/pushpagarwal"
+  },
+  "license": "MIT",
+  "keywords": [
+    "html2pdf",
+    "pdf",
+    "html",
+    "accessibility",
+    "vector pdf",
+    "skia"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "homepage": "https://github.com/pushpagarwal/html2pdf-skia",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pushpagarwal/html2pdf-skia"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.12",
+    "@typescript-eslint/eslint-plugin": "^4.33.0",
+    "@typescript-eslint/parser": "^4.33.0",
+    "eslint": "^7.32.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "4.2.1",
+    "husky": "^8.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "lint-staged": "^15.2.7",
+    "mkdirp": "^3.0.1",
+    "prettier": "^2.3.2",
+    "rimraf": "^6.0.1",
+    "terser-webpack-plugin": "^5.3.14",
+    "ts-jest": "^29.1.5",
+    "ts-loader": "^9.5.2",
+    "ts-node": "^10.9.2",
+    "tslib": "^2.3.0",
+    "typescript": "^5.5.4",
+    "webpack": "^5.100.0",
+    "webpack-cli": "^6.0.1"
+  },
+  "scripts": {
+    "prebuild": "rimraf dist/ && rimraf build/ && mkdirp dist && mkdirp build",
+    "build": "webpack --mode=production",
+    "prepublishOnly": "npm run build",
+    "build:dev": "webpack --mode=development",
+    "build:watch": "webpack --mode=development --watch",
+    "format": "prettier --write \"{src,tests,scripts}/**/*.ts\"",
+    "lint": "eslint src/**/*.ts --max-warnings 0",
+    "test": "npm run lint && npm run unittest",
+    "unittest": "jest",
+    "prepare": "if [ \"$SKIP_PREPARE\" != \"true\" ]; then husky install; fi"
+  },
+  "dependencies": {
+    "canvaskit-wasm": "^0.40.0",
+    "css-line-break": "^2.1.0",
+    "text-segmentation": "^1.0.3"
+  },
+  "lint-staged": {
+    "{src,tests}/**/*.ts": [
+      "prettier --write",
+      "eslint --fix"
+    ]
+  }
+}
