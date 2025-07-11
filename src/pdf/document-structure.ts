@@ -65,7 +65,7 @@ export const PDF_STRUCTURE_TYPES = {
   Figure: "Figure",
   Formula: "Formula",
   Form: "Form",
-
+  NonStruct: "NonStruct",
   // Artifact (non-content elements)
   Artifact: "Artifact",
 } as const;
@@ -300,7 +300,7 @@ function getStructureType(element: Element): string {
     case "aside":
       return PDF_STRUCTURE_TYPES.Note;
     default:
-      return PDF_STRUCTURE_TYPES.Span;
+      return PDF_STRUCTURE_TYPES.NonStruct; // Non-structured content
   }
 }
 
@@ -526,7 +526,9 @@ function processElement(
   }
 
   // Apply tag ID to HTML element
-  applyTagIdToElement(element, tagId);
+  if( shouldApplyPDFTag(structureType)) {
+    applyTagIdToElement(element, tagId);
+  }
   context.tagIdMap.set(element, tagId);
 
   // Create PDF tag
@@ -633,6 +635,14 @@ export function applyPDFStructureToDocument(document: Document): {
  */
 export function getPDFTagForElement(
   element: Element,
+): number | undefined {
+  element.getAttribute(PDF_TAG_ATTRIBUTE);
+  const match = element.getAttribute(PDF_TAG_ATTRIBUTE)?.match(/(\d+)/);
+  return match ? Number(match[1]) : undefined;
+}
+
+export function getPDFTagForElementFromMap(
+  element: Element,
   tagIdMap: Map<Element, number>
 ): number | undefined {
   return tagIdMap.get(element);
@@ -673,4 +683,17 @@ export function validatePDFStructure(structure: PDFTag): boolean {
   };
 
   return validateTag(structure, new Set());
+}
+
+function shouldApplyPDFTag(structureType: string): boolean {
+    return structureType === PDF_STRUCTURE_TYPES.P ||
+        structureType === PDF_STRUCTURE_TYPES.H1 ||
+        structureType === PDF_STRUCTURE_TYPES.H2 ||
+        structureType === PDF_STRUCTURE_TYPES.H3 ||
+        structureType === PDF_STRUCTURE_TYPES.H4 ||
+        structureType === PDF_STRUCTURE_TYPES.H5 ||
+        structureType === PDF_STRUCTURE_TYPES.H6 ||
+        structureType === PDF_STRUCTURE_TYPES.Figure ||
+        structureType === PDF_STRUCTURE_TYPES.TD ||
+        structureType === PDF_STRUCTURE_TYPES.LI; 
 }
