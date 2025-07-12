@@ -1,13 +1,12 @@
 import { Bounds, parseBounds, parseDocumentSize } from "./css/layout/bounds";
-import { COLORS, parseColor } from "./css/types/color";
-import { isTransparent } from "./css/types/color-utilities";
+import { COLORS } from "./css/types/color";
 import {
   CloneConfigurations,
   CloneOptions,
   DocumentCloner,
   WindowOptions,
 } from "./dom/document-cloner";
-import { isBodyElement, isHTMLElement, parseTree } from "./dom/node-parser";
+import { isBodyElement, isHTMLElement, parseBackgroundColor, parseTree } from "./dom/node-parser";
 import { CacheStorage } from "./core/cache-storage";
 import {
   CanvasRenderer,
@@ -171,39 +170,4 @@ const renderElement = async (
   return canvas;
 };
 
-const parseBackgroundColor = (
-  context: Context,
-  element: HTMLElement,
-  backgroundColorOverride?: string | null
-) => {
-  const ownerDocument = element.ownerDocument;
-  // http://www.w3.org/TR/css3-background/#special-backgrounds
-  const documentBackgroundColor = ownerDocument.documentElement
-    ? parseColor(
-        context,
-        getComputedStyle(ownerDocument.documentElement)
-          .backgroundColor as string
-      )
-    : COLORS.TRANSPARENT;
-  const bodyBackgroundColor = ownerDocument.body
-    ? parseColor(
-        context,
-        getComputedStyle(ownerDocument.body).backgroundColor as string
-      )
-    : COLORS.TRANSPARENT;
 
-  const defaultBackgroundColor =
-    typeof backgroundColorOverride === "string"
-      ? parseColor(context, backgroundColorOverride)
-      : backgroundColorOverride === null
-      ? COLORS.TRANSPARENT
-      : 0xffffffff;
-
-  return element === ownerDocument.documentElement
-    ? isTransparent(documentBackgroundColor)
-      ? isTransparent(bodyBackgroundColor)
-        ? defaultBackgroundColor
-        : bodyBackgroundColor
-      : documentBackgroundColor
-    : defaultBackgroundColor;
-};

@@ -65,7 +65,7 @@ export const PDF_STRUCTURE_TYPES = {
   Figure: "Figure",
   Formula: "Formula",
   Form: "Form",
-
+  NonStruct: "NonStruct",
   // Artifact (non-content elements)
   Artifact: "Artifact",
 } as const;
@@ -79,7 +79,6 @@ export const PDF_TAG_ATTRIBUTE = "data-x-pdf-tag-id";
 interface DocumentStructureContext {
   nextId: number;
   tagIdMap: Map<Element, number>;
-  rootTag: PDFTag;
 }
 
 /**
@@ -300,7 +299,7 @@ function getStructureType(element: Element): string {
     case "aside":
       return PDF_STRUCTURE_TYPES.Note;
     default:
-      return PDF_STRUCTURE_TYPES.Span;
+      return PDF_STRUCTURE_TYPES.NonStruct; // Non-structured content
   }
 }
 
@@ -566,12 +565,7 @@ export function generateDocumentStructure(htmlElement: Element | Element[]): {
 } {
     const context: DocumentStructureContext = {
         nextId: 1, // Start from 1, as 0 is reserved for Nothing
-        tagIdMap: new Map(),
-        rootTag: {
-            id: 0,
-            type: PDF_STRUCTURE_TYPES.Document,
-            children: [],
-        },
+        tagIdMap: new Map()
     };
 
     // Handle array of elements
@@ -632,6 +626,14 @@ export function applyPDFStructureToDocument(document: Document): {
  * Get PDF tag for specific HTML element
  */
 export function getPDFTagForElement(
+  element: Element,
+): number | undefined {
+  element.getAttribute(PDF_TAG_ATTRIBUTE);
+  const match = element.getAttribute(PDF_TAG_ATTRIBUTE)?.match(/(\d+)/);
+  return match ? Number(match[1]) : undefined;
+}
+
+export function getPDFTagForElementFromMap(
   element: Element,
   tagIdMap: Map<Element, number>
 ): number | undefined {

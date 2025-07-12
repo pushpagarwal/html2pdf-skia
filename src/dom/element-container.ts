@@ -4,6 +4,7 @@ import { Bounds, parseBounds } from "../css/layout/bounds";
 import { isHTMLElementNode } from "./node-parser";
 import { Context } from "../core/context";
 import { DebuggerType, isDebugging } from "../core/debugger";
+import { getPDFTagForElement } from "../pdf/document-structure";
 
 export const enum FLAGS {
   CREATES_STACKING_CONTEXT = 1 << 1,
@@ -18,6 +19,8 @@ export class ElementContainer {
   readonly elements: ElementContainer[] = [];
   bounds: Bounds;
   flags = 0;
+  readonly pdfTagNodeId?: number;
+
 
   constructor(protected readonly context: Context, element: Element) {
     if (isDebugging(element, DebuggerType.PARSE)) {
@@ -45,5 +48,6 @@ export class ElementContainer {
     if (isDebugging(element, DebuggerType.RENDER)) {
       this.flags |= FLAGS.DEBUG_RENDER;
     }
+    this.pdfTagNodeId = getPDFTagForElement(element);
   }
 }

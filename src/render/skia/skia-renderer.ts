@@ -1,10 +1,10 @@
 // CanvasKit WASM imports
-import { 
-    CanvasKit, 
-    Canvas as SkiaCanvas, 
-    Paint as SkiaPaint, 
-    Path as SkiaPath, 
-    Shader as SkiaShader, 
+import {
+    CanvasKit,
+    Canvas as SkiaCanvas,
+    Paint as SkiaPaint,
+    Path as SkiaPath,
+    Shader as SkiaShader,
     Image as SkiaImage,
     Font as SkiaFont,
     Typeface,
@@ -12,45 +12,45 @@ import {
     FontMgr
 } from 'canvaskit-wasm';
 
-import {ElementPaint, parseStackingContexts, StackingContext} from '../stacking-context';
-import {Color} from '../../css/types/color';
+import { ElementPaint, parseStackingContexts, StackingContext } from '../stacking-context';
+import { Color } from '../../css/types/color';
 import { asString, isTransparent } from "../../css/types/color-utilities";
-import {ElementContainer} from '../../dom/element-container';
-import {BORDER_STYLE} from '../../css/property-descriptors/border-style';
-import {CSSParsedDeclaration} from '../../css';
-import {TextContainer} from '../../dom/text-container';
-import {Path, transformPath} from '../path';
-import {BACKGROUND_CLIP} from '../../css/property-descriptors/background-clip';
-import {BoundCurves, calculateBorderBoxPath, calculateContentBoxPath, calculatePaddingBoxPath} from '../bound-curves';
-import {BezierCurve, isBezierCurve} from '../bezier-curve';
-import {Vector} from '../vector';
-import {CSSURLImage, isLinearGradient, isRadialGradient} from '../../css/types/image';
+import { ElementContainer } from '../../dom/element-container';
+import { BORDER_STYLE } from '../../css/property-descriptors/border-style';
+import { CSSParsedDeclaration } from '../../css';
+import { TextContainer } from '../../dom/text-container';
+import { Path, transformPath } from '../path';
+import { BACKGROUND_CLIP } from '../../css/property-descriptors/background-clip';
+import { BoundCurves, calculateBorderBoxPath, calculateContentBoxPath, calculatePaddingBoxPath } from '../bound-curves';
+import { BezierCurve, isBezierCurve } from '../bezier-curve';
+import { Vector } from '../vector';
+import { CSSURLImage, isLinearGradient, isRadialGradient } from '../../css/types/image';
 import {
     parsePathForBorder,
     parsePathForBorderDoubleInner,
     parsePathForBorderDoubleOuter,
     parsePathForBorderStroke
 } from '../border';
-import {calculateBackgroundRendering, getBackgroundValueForIndex} from '../background';
-import {isDimensionToken} from '../../css/syntax/parser';
-import {segmentGraphemes, TextBounds} from '../../css/layout/text';
-import {ImageElementContainer} from '../../dom/replaced-elements/image-element-container';
-import {contentBox} from '../box-sizing';
-import {CanvasElementContainer} from '../../dom/replaced-elements/canvas-element-container';
-import {SVGElementContainer} from '../../dom/replaced-elements/svg-element-container';
-import {ReplacedElementContainer} from '../../dom/replaced-elements';
-import {IElementEffect, isClipEffect, isOpacityEffect, isTransformEffect} from '../effects';
-import {contains} from '../../core/bitwise';
-import {calculateGradientDirection, calculateRadius, processColorStops} from '../../css/types/functions/gradient';
-import {FIFTY_PERCENT, getAbsoluteValue} from '../../css/types/length-percentage';
-import {FontMetrics} from '../font-metrics';
-import {Bounds} from '../../css/layout/bounds';
-import {computeLineHeight} from '../../css/property-descriptors/line-height';
-import {CHECKBOX, INPUT_COLOR, InputElementContainer, RADIO} from '../../dom/replaced-elements/input-element-container';
-import {TextareaElementContainer} from '../../dom/elements/textarea-element-container';
-import {SelectElementContainer} from '../../dom/elements/select-element-container';
-import {IFrameElementContainer} from '../../dom/replaced-elements/iframe-element-container';
-import {TextShadow} from '../../css/property-descriptors/text-shadow';
+import { calculateBackgroundRendering, getBackgroundValueForIndex } from '../background';
+import { isDimensionToken } from '../../css/syntax/parser';
+import { segmentGraphemes, TextBounds } from '../../css/layout/text';
+import { ImageElementContainer } from '../../dom/replaced-elements/image-element-container';
+import { contentBox } from '../box-sizing';
+import { CanvasElementContainer } from '../../dom/replaced-elements/canvas-element-container';
+import { SVGElementContainer } from '../../dom/replaced-elements/svg-element-container';
+import { ReplacedElementContainer } from '../../dom/replaced-elements';
+import { IElementEffect, isClipEffect, isOpacityEffect, isTransformEffect } from '../effects';
+import { contains } from '../../core/bitwise';
+import { calculateGradientDirection, calculateRadius, processColorStops } from '../../css/types/functions/gradient';
+import { FIFTY_PERCENT, getAbsoluteValue } from '../../css/types/length-percentage';
+import { FontMetrics } from '../font-metrics';
+import { Bounds } from '../../css/layout/bounds';
+import { computeLineHeight } from '../../css/property-descriptors/line-height';
+import { CHECKBOX, INPUT_COLOR, InputElementContainer, RADIO } from '../../dom/replaced-elements/input-element-container';
+import { TextareaElementContainer } from '../../dom/elements/textarea-element-container';
+import { SelectElementContainer } from '../../dom/elements/select-element-container';
+import { IFrameElementContainer } from '../../dom/replaced-elements/iframe-element-container';
+import { TextShadow } from '../../css/property-descriptors/text-shadow';
 import { Context } from '../../core/context';
 
 export interface CanvasKitConfig {
@@ -102,7 +102,7 @@ class GlobalAlpha {
     }
 }
 
-export class SkiaRenderer  {
+export class SkiaRenderer {
     canvas: SkiaCanvas;
     canvasKit: CanvasKit;
     private readonly _activeEffects: IElementEffect[] = [];
@@ -110,7 +110,7 @@ export class SkiaRenderer  {
     private readonly fontProvider: FontMgr;
     private readonly globalAlpha: GlobalAlpha = new GlobalAlpha();
 
-    constructor(private context:Context, ckConfig: CanvasKitConfig, private options: SkiaRenderConfigurations) {
+    constructor(private context: Context, ckConfig: CanvasKitConfig, private options: SkiaRenderConfigurations) {
         this.canvas = ckConfig.canvas;
         this.canvasKit = ckConfig.canvasKit;
         this.fontMetrics = new FontMetrics(document);
@@ -133,7 +133,7 @@ export class SkiaRenderer  {
         } catch {
             // Fallback parsing
         }
-        
+
         // Manual color parsing fallback
         if (colorString.startsWith('#')) {
             const hex = colorString.slice(1);
@@ -143,7 +143,7 @@ export class SkiaRenderer  {
             const a = hex.length > 6 ? parseInt(hex.slice(6, 8), 16) / 255 : 1;
             return this.canvasKit.Color4f ? this.canvasKit.Color4f(r, g, b, a) : this.canvasKit.Color(r * 255, g * 255, b * 255, a);
         }
-        
+
         // Parse rgba/rgb strings
         const rgbaMatch = colorString.match(/rgba?\(([^)]+)\)/);
         if (rgbaMatch) {
@@ -156,7 +156,7 @@ export class SkiaRenderer  {
                 return this.canvasKit.Color4f ? this.canvasKit.Color4f(r, g, b, a) : this.canvasKit.Color(values[0], values[1], values[2], a);
             }
         }
-        
+
         // Default to black
         return this.canvasKit.Color4f ? this.canvasKit.Color4f(0, 0, 0, 1) : this.canvasKit.Color(0, 0, 0, 1);
     }
@@ -171,10 +171,10 @@ export class SkiaRenderer  {
 
     private createPaint(style: 'fill' | 'stroke' = 'fill'): SkiaPaint {
         const paint = new this.canvasKit.Paint();
-        const paintStyleValue = style === 'fill' ? 
-            (this.canvasKit.PaintStyle?.Fill ?? this.canvasKit.PaintStyle.Fill) : 
+        const paintStyleValue = style === 'fill' ?
+            (this.canvasKit.PaintStyle?.Fill ?? this.canvasKit.PaintStyle.Fill) :
             (this.canvasKit.PaintStyle?.Stroke ?? this.canvasKit.PaintStyle.Stroke);
-        
+
         paint.setStyle(paintStyleValue);
         if (paint.setAntiAlias) {
             paint.setAntiAlias(true);
@@ -192,11 +192,11 @@ export class SkiaRenderer  {
 
     applyEffect(effect: IElementEffect): void {
         this.canvas.save();
-        
+
         if (isOpacityEffect(effect)) {
             this.globalAlpha.push(effect.opacity);
         }
-        
+
         if (isTransformEffect(effect)) {
             this.canvas.translate(effect.offsetX, effect.offsetY);
             // Create a 3x3 matrix for the transform
@@ -267,19 +267,19 @@ export class SkiaRenderer  {
         const fontVariant = styles.fontVariant
             .filter((variant) => variant === 'normal' || variant === 'small-caps')
             .join('');
-        
+
         const fontFamily = fixIOSSystemFonts(styles.fontFamily);
-        
+
         const fontSize = isDimensionToken(styles.fontSize)
             ? styles.fontSize.number
             : styles.fontSize.number;
 
         // Convert CSS font-weight to Skia FontWeight
         const fontWeight = this.mapCSSFontWeightToSkia(styles.fontWeight);
-        
+
         // Convert CSS font-style to Skia FontSlant
         const fontSlant = this.mapCSSFontStyleToSkia(styles.fontStyle);
-        
+
         // Handle font-variant mapping to style name if needed
         const skiaFontStyle: FontStyle = {
             weight: fontWeight,
@@ -349,10 +349,10 @@ export class SkiaRenderer  {
     private createSkiaFont(styles: CSSParsedDeclaration): SkiaFont {
         const fontInfo = this.parseFontStyle(styles);
         const font = new this.canvasKit.Font();
-        
+
         // Set font size
         font.setSize(fontInfo.fontSize);
-        
+
         // Try to get a typeface for each font family until one is found
         let typeface: Typeface | null = null;
         for (const family of [...fontInfo.fontFamily, 'Roboto']) {
@@ -371,21 +371,25 @@ export class SkiaRenderer  {
         if (typeface) {
             font.setTypeface(typeface);
         }
-        
+
         // Set font properties
         if (font.setSubpixel) {
             font.setSubpixel(true);
         }
-        
-        return font;
-    }
 
+        return font;
+    }    
+    
     async renderTextNode(text: TextContainer, styles: CSSParsedDeclaration): Promise<void> {
         const font = this.createSkiaFont(styles);
-        const {baseline, middle} = this.fontMetrics.getMetrics(styles.fontFamily.join(', '), styles.fontSize.number.toString());
+        const { baseline, middle } = this.fontMetrics.getMetrics(styles.fontFamily.join(', '), styles.fontSize.number.toString());
         const paintOrder = styles.paintOrder;
 
         text.textBounds.forEach((textBounds) => {
+            // Don't draw empty text bounds
+            if(textBounds.bounds.width <= 0 || textBounds.bounds.height <= 0) {
+                return;
+            }
             paintOrder.forEach((paintOrderLayer) => {
                 switch (paintOrderLayer) {
                     case 0 /* PAINT_ORDER_LAYER.FILL */:
@@ -402,15 +406,15 @@ export class SkiaRenderer  {
                                 .forEach((textShadow) => {
                                     const shadowPaint = fillPaint.copy();
                                     shadowPaint.setColor(this.parseColorWithAlpha(textShadow.color));
-                                    
+
                                     this.canvas.save();
                                     this.canvas.translate(
                                         textShadow.offsetX.number * (this.options as any).scale,
                                         textShadow.offsetY.number * (this.options as any).scale
-                                    );                                  
+                                    );
                                     const blurEffect = this.canvasKit.MaskFilter.MakeBlur(this.canvasKit.BlurStyle.Normal,
-                                    textShadow.blur.number/2,
-                                    false);
+                                        textShadow.blur.number / 2,
+                                        false);
                                     shadowPaint.setMaskFilter(blurEffect);
                                     this.renderTextWithLetterSpacing(textBounds, styles.letterSpacing, baseline, shadowPaint, font);
                                     this.canvas.restore();
@@ -424,7 +428,7 @@ export class SkiaRenderer  {
 
                             styles.textDecorationLine.forEach((textDecorationLine) => {
                                 const rect: [number, number, number, number] = [0, 0, 0, 0];
-                                
+
                                 switch (textDecorationLine) {
                                     case 1 /* TEXT_DECORATION_LINE.UNDERLINE */:
                                         rect[0] = textBounds.bounds.left;
@@ -445,7 +449,7 @@ export class SkiaRenderer  {
                                         rect[3] = Math.ceil(textBounds.bounds.top + middle) + 1;
                                         break;
                                 }
-                                
+
                                 if (rect[2] > rect[0] && rect[3] > rect[1]) {
                                     this.canvas.drawRect(rect, decorationPaint);
                                 }
@@ -454,7 +458,7 @@ export class SkiaRenderer  {
                         }
                         fillPaint.delete();
                         break;
-                        
+
                     case 1 /* PAINT_ORDER_LAYER.STROKE */:
                         if (styles.webkitTextStrokeWidth && textBounds.text.trim().length) {
                             const strokePaint = this.createPaint('stroke');
@@ -480,19 +484,19 @@ export class SkiaRenderer  {
         if (image && container.intrinsicWidth > 0 && container.intrinsicHeight > 0) {
             const box = contentBox(container);
             const path = this.createSkiaPath(calculatePaddingBoxPath(curves));
-            
+
             this.canvas.save();
             this.canvas.clipPath(path, this.canvasKit.ClipOp.Intersect, true);
-            
+
             const paint = this.createPaint('fill');
-            
+
             this.canvas.drawImageRect(
                 image,
                 [0, 0, container.intrinsicWidth, container.intrinsicHeight],
                 [box.left, box.top, box.left + box.width, box.top + box.height],
                 paint
             );
-            
+
             this.canvas.restore();
             paint.delete();
             path.delete();
@@ -509,9 +513,11 @@ export class SkiaRenderer  {
         this.applyEffects(paint.getEffects(4 /* EffectTarget.CONTENT */));
         const container = paint.container;
         const styles = container.styles;
-        
+        if (container.pdfTagNodeId) {
+            this.canvasKit.SetPDFTagId(this.canvas, container.pdfTagNodeId);
+        }
         for (const child of container.textNodes) {
-            await this.renderTextNode(child, styles);
+                await this.renderTextNode(child, styles);
         }
 
         if (container instanceof ImageElementContainer) {
@@ -575,7 +581,7 @@ export class SkiaRenderer  {
         if (container instanceof IFrameElementContainer && container.tree) {
             // Create a PictureRecorder to capture the iframe drawing commands
             const pictureRecorder = new this.canvasKit.PictureRecorder();
-            
+
             // Begin recording with the iframe bounds
             const iframeBounds = [
                 0, 0,
@@ -583,7 +589,7 @@ export class SkiaRenderer  {
                 container.height
             ];
             const iframeCanvas = pictureRecorder.beginRecording(iframeBounds);
-            
+
             // Create a new SkiaRenderer for the iframe content
             const iframeRenderer = new SkiaRenderer(this.context, {
                 canvasKit: this.canvasKit,
@@ -600,17 +606,17 @@ export class SkiaRenderer  {
 
             // Render the iframe content to the recorded canvas
             await iframeRenderer.render(container.tree);
-            
+
             // Finish recording and get the picture
             const picture = pictureRecorder.finishRecordingAsPicture();
-            
+
             // Draw the picture on the main canvas at the iframe's position
             this.canvas.save();
             this.canvas.translate(container.bounds.left, container.bounds.top);
             this.canvas.scale((container.bounds.width / container.width), (container.bounds.height / container.height));
             this.canvas.drawPicture(picture);
             this.canvas.restore();
-            
+
             // Clean up
             picture.delete();
             pictureRecorder.delete();
@@ -634,7 +640,7 @@ export class SkiaRenderer  {
                     paint.setColor(this.parseColorWithAlpha(INPUT_COLOR));
 
                     this.canvas.drawPath(checkPath, paint);
-                    
+
                     paint.delete();
                     checkPath.delete();
                 }
@@ -649,7 +655,7 @@ export class SkiaRenderer  {
                         size / 4,
                         paint
                     );
-                    
+
                     paint.delete();
                 }
             }
@@ -657,7 +663,7 @@ export class SkiaRenderer  {
 
         if (isTextInputElement(container) && container.value.length) {
             const font = this.createSkiaFont(styles);
-            const {baseline} = this.fontMetrics.getMetrics(styles.fontFamily.join(', '), styles.fontSize.number.toString());
+            const { baseline } = this.fontMetrics.getMetrics(styles.fontFamily.join(', '), styles.fontSize.number.toString());
 
             const paint = this.createPaint('fill');
             paint.setColor(this.parseColorWithAlpha(styles.color));
@@ -678,7 +684,7 @@ export class SkiaRenderer  {
 
             this.canvas.save();
             this.canvas.clipRect([bounds.left, bounds.top, bounds.left + bounds.width, bounds.top + bounds.height], this.canvasKit.ClipOp.Intersect, true);
-            
+
             this.renderTextWithLetterSpacing(
                 new TextBounds(container.value, textBounds),
                 styles.letterSpacing,
@@ -686,7 +692,7 @@ export class SkiaRenderer  {
                 paint,
                 font
             );
-            
+
             this.canvas.restore();
             paint.delete();
             font.delete();
@@ -706,7 +712,7 @@ export class SkiaRenderer  {
                                 computeLineHeight(styles.lineHeight, styles.fontSize.number),
                                 container.bounds.width
                             );
-                            
+
                             const bounds = new Bounds(
                                 container.bounds.left - markerSize - 5,
                                 container.bounds.top + getAbsoluteValue(container.styles.paddingTop, container.bounds.width),
@@ -721,7 +727,7 @@ export class SkiaRenderer  {
                                 [bounds.left, bounds.top, bounds.left + bounds.width, bounds.top + bounds.height],
                                 paint
                             );
-                            
+
                             paint.delete();
                             skiaImage.delete();
                         }
@@ -748,10 +754,13 @@ export class SkiaRenderer  {
                     listPaint,
                     font
                 );
-                
+
                 listPaint.delete();
                 font.delete();
             }
+        }
+        if (container.pdfTagNodeId) {
+            this.canvasKit.SetPDFTagId(this.canvas, 0);
         }
     }
 
@@ -759,28 +768,28 @@ export class SkiaRenderer  {
         if (contains(stack.element.container.flags, 16 /* FLAGS.DEBUG_RENDER */)) {
             debugger;
         }
-        
+
         // https://www.w3.org/TR/css-position-3/#painting-order
         // 1. the background and borders of the element forming the stacking context.
         await this.renderNodeBackgroundAndBorders(stack.element);
-        
+
         // 2. the child stacking contexts with negative stack levels (most negative first).
         for (const child of stack.negativeZIndex) {
             await this.renderStack(child);
         }
-        
+
         // 3. For all its in-flow, non-positioned, block-level descendants in tree order:
         await this.renderNodeContent(stack.element);
 
         for (const child of stack.nonInlineLevel) {
             await this.renderNode(child);
         }
-        
+
         // 4. All non-positioned floating descendants, in tree order.
         for (const child of stack.nonPositionedFloats) {
             await this.renderStack(child);
         }
-        
+
         // 5. the in-flow, inline-level, non-positioned descendants, including inline tables and inline blocks.
         for (const child of stack.nonPositionedInlineLevel) {
             await this.renderStack(child);
@@ -788,12 +797,12 @@ export class SkiaRenderer  {
         for (const child of stack.inlineLevel) {
             await this.renderNode(child);
         }
-        
+
         // 6. All positioned, opacity or transform descendants, in tree order
         for (const child of stack.zeroOrAutoZIndexOrTransformedOrOpacity) {
             await this.renderStack(child);
         }
-        
+
         // 7. Stacking contexts formed by positioned descendants with z-indices greater than or equal to 1
         for (const child of stack.positiveZIndex) {
             await this.renderStack(child);
@@ -803,11 +812,11 @@ export class SkiaRenderer  {
     mask(paths: Path[]): void {
         const maskPath = new this.canvasKit.Path();
         maskPath.addRect([0, 0, (this.options as any).width, (this.options as any).height]);
-        
+
         // Add the mask paths (reversed)
         const reversedPaths = paths.slice(0).reverse();
         this.formatSkiaPath(maskPath, reversedPaths);
-        
+
         this.canvas.clipPath(maskPath, this.canvasKit.ClipOp.Intersect, true);
         maskPath.delete();
     }
@@ -873,7 +882,7 @@ export class SkiaRenderer  {
                             const shader = skiaImage.makeShaderCubic(
                                 this.canvasKit.TileMode.Repeat,
                                 this.canvasKit.TileMode.Repeat,
-                                1/3,1/3,
+                                1 / 3, 1 / 3,
                                 this.canvasKit.Matrix.identity()
                             );
 
@@ -888,7 +897,7 @@ export class SkiaRenderer  {
                             paint.delete();
                             skiaPath.delete();
                             skiaImage.delete();
-                        }   
+                        }
                     }
                 } catch (e) {
                     this.context.logger.error(`Error loading background-image ${url}`);
@@ -899,13 +908,13 @@ export class SkiaRenderer  {
 
                 const colors: Float32Array[] = [];
                 const positions: number[] = [];
-                
+
                 processColorStops(backgroundImage.stops, lineLength).forEach((colorStop) => {
                     colors.push(this.parseColor(colorStop.color));
                     positions.push(colorStop.stop);
                 });
 
-                const shader = this.canvasKit.Shader?.MakeLinearGradient ? 
+                const shader = this.canvasKit.Shader?.MakeLinearGradient ?
                     this.canvasKit.Shader.MakeLinearGradient(
                         [x0, y0],
                         [x1, y1],
@@ -932,13 +941,13 @@ export class SkiaRenderer  {
                 if (rx > 0 && ry > 0) {
                     const colors: Float32Array[] = [];
                     const positions: number[] = [];
-                    
+
                     processColorStops(backgroundImage.stops, rx * 2).forEach((colorStop) => {
                         colors.push(this.parseColor(colorStop.color));
                         positions.push(colorStop.stop);
                     });
 
-                    const shader = this.canvasKit.Shader?.MakeRadialGradient ? 
+                    const shader = this.canvasKit.Shader?.MakeRadialGradient ?
                         this.canvasKit.Shader.MakeRadialGradient(
                             [left + x, top + y],
                             rx,
@@ -952,25 +961,25 @@ export class SkiaRenderer  {
                         const paint = this.createPaint('fill');
                         paint.setShader(shader);
 
-                    if (rx !== ry) {
-                        // transforms for elliptical radial gradient
-                        const midX = container.bounds.left + 0.5 * container.bounds.width;
-                        const midY = container.bounds.top + 0.5 * container.bounds.height;
-                        const f = ry / rx;
-                        const invF = 1 / f;
+                        if (rx !== ry) {
+                            // transforms for elliptical radial gradient
+                            const midX = container.bounds.left + 0.5 * container.bounds.width;
+                            const midY = container.bounds.top + 0.5 * container.bounds.height;
+                            const f = ry / rx;
+                            const invF = 1 / f;
 
-                        this.canvas.save();
-                        this.canvas.translate(midX, midY);
-                        // Create a 3x3 matrix for the transform
-                        const scaleMatrix = [1, 0, 0, 0, f, 0, 0, 0, 1];
-                        this.canvas.concat(scaleMatrix);
-                        this.canvas.translate(-midX, -midY);
+                            this.canvas.save();
+                            this.canvas.translate(midX, midY);
+                            // Create a 3x3 matrix for the transform
+                            const scaleMatrix = [1, 0, 0, 0, f, 0, 0, 0, 1];
+                            this.canvas.concat(scaleMatrix);
+                            this.canvas.translate(-midX, -midY);
 
-                        this.canvas.drawRect([left, invF * (top - midY) + midY, left + width, invF * (top - midY) + midY + height * invF], paint);
-                        this.canvas.restore();
-                    } else {
-                        this.canvas.drawPath(skiaPath, paint);
-                    }
+                            this.canvas.drawRect([left, invF * (top - midY) + midY, left + width, invF * (top - midY) + midY + height * invF], paint);
+                            this.canvas.restore();
+                        } else {
+                            this.canvas.drawPath(skiaPath, paint);
+                        }
 
                         paint.delete();
                         skiaPath.delete();
@@ -988,7 +997,7 @@ export class SkiaRenderer  {
         paint.setColor(this.parseColorWithAlpha(color));
 
         this.canvas.drawPath(path, paint);
-        
+
         paint.delete();
         path.delete();
     }
@@ -1001,13 +1010,13 @@ export class SkiaRenderer  {
 
         const outerPath = this.createSkiaPath(parsePathForBorderDoubleOuter(curvePoints, side));
         const innerPath = this.createSkiaPath(parsePathForBorderDoubleInner(curvePoints, side));
-        
+
         const paint = this.createPaint('fill');
         paint.setColor(this.parseColorWithAlpha(color));
 
         this.canvas.drawPath(outerPath, paint);
         this.canvas.drawPath(innerPath, paint);
-        
+
         paint.delete();
         outerPath.delete();
         innerPath.delete();
@@ -1019,10 +1028,10 @@ export class SkiaRenderer  {
         const hasBackground = !isTransparent(styles.backgroundColor) || styles.backgroundImage.length;
 
         const borders = [
-            {style: styles.borderTopStyle, color: styles.borderTopColor, width: styles.borderTopWidth},
-            {style: styles.borderRightStyle, color: styles.borderRightColor, width: styles.borderRightWidth},
-            {style: styles.borderBottomStyle, color: styles.borderBottomColor, width: styles.borderBottomWidth},
-            {style: styles.borderLeftStyle, color: styles.borderLeftColor, width: styles.borderLeftWidth}
+            { style: styles.borderTopStyle, color: styles.borderTopColor, width: styles.borderTopWidth },
+            { style: styles.borderRightStyle, color: styles.borderRightColor, width: styles.borderRightWidth },
+            { style: styles.borderBottomStyle, color: styles.borderBottomColor, width: styles.borderBottomWidth },
+            { style: styles.borderLeftStyle, color: styles.borderLeftColor, width: styles.borderLeftWidth }
         ];
 
         const backgroundPaintingArea = calculateBackgroundCurvedPaintingArea(
@@ -1038,7 +1047,7 @@ export class SkiaRenderer  {
             if (!isTransparent(styles.backgroundColor)) {
                 const bgPaint = this.createPaint('fill');
                 bgPaint.setColor(this.parseColorWithAlpha(styles.backgroundColor));
-                
+
                 this.canvas.drawPath(backgroundPath, bgPaint);
                 bgPaint.delete();
             }
@@ -1081,21 +1090,21 @@ export class SkiaRenderer  {
                     } else {
                         shadowPaint.setColor(this.canvasKit.multiplyByAlpha(this.canvasKit.Color4f(0, 0, 0, 1), this.globalAlpha.value));
                     }
-                    
+
                     const blurEffect = this.canvasKit.MaskFilter.MakeBlur(this.canvasKit.BlurStyle.Normal,
-                        shadow.blur.number/2,
+                        shadow.blur.number / 2,
                         false);
-                    shadowPaint.setMaskFilter(blurEffect); 
+                    shadowPaint.setMaskFilter(blurEffect);
                     this.canvas.save();
                     this.canvas.translate(
                         shadow.offsetX.number + maskOffset,
                         shadow.offsetY.number
                     );
-                    
+
                     const shadowPath = this.createSkiaPath(shadowPaintingArea);
                     this.canvas.drawPath(shadowPath, shadowPaint);
                     this.canvas.restore();
-                    
+
                     shadowPaint.delete();
                     shadowPath.delete();
                     this.canvas.restore();
@@ -1204,15 +1213,15 @@ export class SkiaRenderer  {
             paint.setPathEffect(this.canvasKit.PathEffect.MakeDash([0, dashLength + spaceLength], 0));
         } else {
             paint.setStrokeWidth(width * 2 + 1.1);
-            paint.setPathEffect(this.canvasKit.PathEffect.MakeDash([dashLength, spaceLength], 0));        
+            paint.setPathEffect(this.canvasKit.PathEffect.MakeDash([dashLength, spaceLength], 0));
         }
 
-        const strokePath = style === 3 /* BORDER_STYLE.DOTTED */ ? 
-            this.createSkiaPath(strokePaths) : 
+        const strokePath = style === 3 /* BORDER_STYLE.DOTTED */ ?
+            this.createSkiaPath(strokePaths) :
             this.createSkiaPath(boxPaths.slice(0, 2));
-            
+
         this.canvas.drawPath(strokePath, paint);
-        
+
         paint.delete();
         strokePath.delete();
         this.canvas.restore();
@@ -1228,7 +1237,7 @@ export class SkiaRenderer  {
                 this.context.logger.error(`MakeImageFromCanvasImageSource failed for ${srcType}`);
                 return null;
             }
-            
+
             return skiaImage;
         } catch (error) {
             const srcType = src.constructor.name;
@@ -1263,10 +1272,10 @@ export class SkiaRenderer  {
                 img.onload = async () => {
                     // Draw SVG image to canvas
                     tempCtx.drawImage(img, 0, 0);
-                    
+
                     // Get image data and convert to SkiaImage
                     const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-                    
+
                     const skiaImage = this.canvasKit.MakeImageFromEncoded(imageData.data);
                     if (!skiaImage) {
                         // Fallback: try creating from raw pixel data
@@ -1281,7 +1290,7 @@ export class SkiaRenderer  {
                     } else {
                         resolve(skiaImage);
                     }
-                    
+
                     URL.revokeObjectURL(url);
                 };
                 img.onerror = () => {
@@ -1301,14 +1310,14 @@ export class SkiaRenderer  {
         if ((this.options as any).backgroundColor) {
             const bgPaint = this.createPaint('fill');
             bgPaint.setColor(this.parseColorWithAlpha((this.options as any).backgroundColor));
-            
+
             this.canvas.drawRect([
                 (this.options as any).x,
                 (this.options as any).y,
                 (this.options as any).x + (this.options as any).width,
                 (this.options as any).y + (this.options as any).height
             ], bgPaint);
-            
+
             bgPaint.delete();
         }
 
