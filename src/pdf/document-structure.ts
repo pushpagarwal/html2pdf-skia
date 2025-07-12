@@ -79,7 +79,6 @@ export const PDF_TAG_ATTRIBUTE = "data-x-pdf-tag-id";
 interface DocumentStructureContext {
   nextId: number;
   tagIdMap: Map<Element, number>;
-  rootTag: PDFTag;
 }
 
 /**
@@ -526,9 +525,7 @@ function processElement(
   }
 
   // Apply tag ID to HTML element
-  if( shouldApplyPDFTag(structureType)) {
-    applyTagIdToElement(element, tagId);
-  }
+  applyTagIdToElement(element, tagId);
   context.tagIdMap.set(element, tagId);
 
   // Create PDF tag
@@ -568,12 +565,7 @@ export function generateDocumentStructure(htmlElement: Element | Element[]): {
 } {
     const context: DocumentStructureContext = {
         nextId: 1, // Start from 1, as 0 is reserved for Nothing
-        tagIdMap: new Map(),
-        rootTag: {
-            id: 0,
-            type: PDF_STRUCTURE_TYPES.Document,
-            children: [],
-        },
+        tagIdMap: new Map()
     };
 
     // Handle array of elements
@@ -683,17 +675,4 @@ export function validatePDFStructure(structure: PDFTag): boolean {
   };
 
   return validateTag(structure, new Set());
-}
-
-function shouldApplyPDFTag(structureType: string): boolean {
-    return structureType === PDF_STRUCTURE_TYPES.P ||
-        structureType === PDF_STRUCTURE_TYPES.H1 ||
-        structureType === PDF_STRUCTURE_TYPES.H2 ||
-        structureType === PDF_STRUCTURE_TYPES.H3 ||
-        structureType === PDF_STRUCTURE_TYPES.H4 ||
-        structureType === PDF_STRUCTURE_TYPES.H5 ||
-        structureType === PDF_STRUCTURE_TYPES.H6 ||
-        structureType === PDF_STRUCTURE_TYPES.Figure ||
-        structureType === PDF_STRUCTURE_TYPES.TD ||
-        structureType === PDF_STRUCTURE_TYPES.LI; 
 }

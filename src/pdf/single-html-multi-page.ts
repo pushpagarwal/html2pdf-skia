@@ -45,6 +45,9 @@ export class SingleHtmlMultiPageProvider implements IPdfInputProvider {
         await delay(0); // Yield to allow other tasks to run
         return nextPage;
     }
+    getDocumentTitle(): string {
+        return this.document.title || "Document";
+    }
     
 }
 
@@ -106,8 +109,9 @@ export async function exportHTMLDocumentToPdf(
    const container = await documentCloner.toIFrame(document, new Bounds(0, 0, devicePageSize.width, devicePageSize.height));
    appendPageStyles(clonedElement.ownerDocument);
    const fontLoader = getFontLoader(canvasKit, options.fontLoader);
-
-   const pdfInputProvider = new SingleHtmlMultiPageProvider(clonedElement.ownerDocument, devicePageSize, fontLoader);
+   const iframeDocument = clonedElement.ownerDocument;
+   iframeDocument.title = document.title || "Document";
+   const pdfInputProvider = new SingleHtmlMultiPageProvider(iframeDocument, devicePageSize, fontLoader);
    const blob = await exportToPdf(
        canvasKit,
        context,

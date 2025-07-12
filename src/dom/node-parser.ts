@@ -11,6 +11,8 @@ import { SelectElementContainer } from "./elements/select-element-container";
 import { TextareaElementContainer } from "./elements/textarea-element-container";
 import { IFrameElementContainer } from "./replaced-elements/iframe-element-container";
 import { Context } from "../core/context";
+import { COLORS, parseColor } from "../css/types/color";
+import { isTransparent } from "../css/types/color-utilities";
 
 const LIST_OWNERS = ["OL", "UL", "MENU"];
 
@@ -181,3 +183,40 @@ export const isSlotElement = (node: Element): node is HTMLSlotElement =>
 // https://html.spec.whatwg.org/multipage/custom-elements.html#valid-custom-element-name
 export const isCustomElement = (node: Element): node is HTMLElement =>
   node.tagName.indexOf("-") > 0;
+
+export const parseBackgroundColor = (
+  context: Context,
+  element: HTMLElement,
+  backgroundColorOverride?: string | null
+) => {
+  const ownerDocument = element.ownerDocument;
+  // http://www.w3.org/TR/css3-background/#special-backgrounds
+  const documentBackgroundColor = ownerDocument.documentElement
+    ? parseColor(
+        context,
+        getComputedStyle(ownerDocument.documentElement)
+          .backgroundColor as string
+      )
+    : COLORS.TRANSPARENT;
+  const bodyBackgroundColor = ownerDocument.body
+    ? parseColor(
+        context,
+        getComputedStyle(ownerDocument.body).backgroundColor as string
+      )
+    : COLORS.TRANSPARENT;
+
+  const defaultBackgroundColor =
+    typeof backgroundColorOverride === "string"
+      ? parseColor(context, backgroundColorOverride)
+      : backgroundColorOverride === null
+      ? COLORS.TRANSPARENT
+      : 0xffffffff;
+
+  return element === ownerDocument.documentElement
+    ? isTransparent(documentBackgroundColor)
+      ? isTransparent(bodyBackgroundColor)
+        ? defaultBackgroundColor
+        : bodyBackgroundColor
+      : documentBackgroundColor
+    : defaultBackgroundColor;
+};

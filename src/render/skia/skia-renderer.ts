@@ -378,14 +378,18 @@ export class SkiaRenderer {
         }
 
         return font;
-    }
-
+    }    
+    
     async renderTextNode(text: TextContainer, styles: CSSParsedDeclaration): Promise<void> {
         const font = this.createSkiaFont(styles);
         const { baseline, middle } = this.fontMetrics.getMetrics(styles.fontFamily.join(', '), styles.fontSize.number.toString());
         const paintOrder = styles.paintOrder;
 
         text.textBounds.forEach((textBounds) => {
+            // Don't draw empty text bounds
+            if(textBounds.bounds.width <= 0 || textBounds.bounds.height <= 0) {
+                return;
+            }
             paintOrder.forEach((paintOrderLayer) => {
                 switch (paintOrderLayer) {
                     case 0 /* PAINT_ORDER_LAYER.FILL */:
@@ -513,7 +517,7 @@ export class SkiaRenderer {
             this.canvasKit.SetPDFTagId(this.canvas, container.pdfTagNodeId);
         }
         for (const child of container.textNodes) {
-            await this.renderTextNode(child, styles);
+                await this.renderTextNode(child, styles);
         }
 
         if (container instanceof ImageElementContainer) {

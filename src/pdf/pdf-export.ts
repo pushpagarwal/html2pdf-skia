@@ -1,5 +1,5 @@
 import { CanvasKit, FontMgr, PDFMetadata, PDFTag } from "canvaskit-wasm";
-import { parseTree } from "../dom/node-parser";
+import { parseBackgroundColor, parseTree } from "../dom/node-parser";
 import { Context } from "../core/context";
 import { SkiaRenderer } from "../render/skia/skia-renderer";
 
@@ -8,6 +8,7 @@ export interface IPageSize {
     height: number;
 }
 export interface IPdfInputProvider {
+    getDocumentTitle(): string;
     getDocumentStructure(): PDFTag;
     getFontManager(): Promise<FontMgr>;
     getNextPageElement(): Promise<HTMLElement | null>;
@@ -22,6 +23,7 @@ export interface IPdfOptions {
     keywords: string;
     creator: string;
     producer: string;
+    language?: string;
     pageSize: { width: number; height: number };
     fontLoader: FontLoader;
 }
@@ -33,12 +35,13 @@ export async function exportToPdf(
     pdfOptions?: Partial<IPdfOptions>): Promise<Blob> {
     const rootTag = inputProvider.getDocumentStructure();
     const metadata: PDFMetadata = new canvasKit.PDFMetadata({
-        title: pdfOptions?.title ?? "Document",
+        title: pdfOptions?.title ?? inputProvider.getDocumentTitle(),
         author: pdfOptions?.author ?? "",
         subject: pdfOptions?.subject ?? "",
         keywords: pdfOptions?.keywords ?? "",
         creator: pdfOptions?.creator ?? "html2pdf-skia",
         producer: pdfOptions?.producer ?? "html2pdf-skia",
+        language: pdfOptions?.language ?? "en-US",
         rootTag: rootTag,
     });
     const fontManager = await inputProvider.getFontManager();
@@ -66,9 +69,14 @@ export async function exportToPdf(
         if (!canvas) {
             throw new Error("Failed to create PDF page canvas");
         }
+        const documentElement = nextPageElement.ownerDocument.documentElement;
+        const backgroundColor = parseBackgroundColor(
+            context,
+            documentElement
+        );
         const elementContainer = parseTree(context, nextPageElement);
         canvas.save();
-        canvas.scale(1/window.devicePixelRatio, 1/window.devicePixelRatio);
+        canvas.scale(1 / window.devicePixelRatio, 1 / window.devicePixelRatio);
         const renderer = new SkiaRenderer(
             context,
             {
@@ -76,13 +84,13 @@ export async function exportToPdf(
                 canvas,
                 fontProvider: fontManager,
             }, {
-                scale: 1,
-                x: 0,
-                y: 0,
-                width: pageWidth*window.devicePixelRatio,
-                height: pageHeight*window.devicePixelRatio,
-                backgroundColor: null,
-            });
+            scale: 1,
+            x: 0,
+            y: 0,
+            width: pageWidth * window.devicePixelRatio,
+            height: pageHeight * window.devicePixelRatio,
+            backgroundColor: backgroundColor,
+        });
         await renderer.render(elementContainer);
         canvas.restore();
         // render the page content
