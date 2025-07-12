@@ -10,12 +10,12 @@ export class HtmlPageBreak {
         this.pageHeight = pageHeight;
     }
 
-    public processPage(): HTMLElement| null {
+    public processPage(): HTMLElement | null {
         let finalPageHeight = this.pageHeight;
         this.pageItems = []; // Reset page items
 
         const getUnionOfBounds = (bounds1?: DOMRect, bounds2?: DOMRect): DOMRect | undefined => {
-            if(!bounds1) {
+            if (!bounds1) {
                 return bounds2; // If no bounds1, return bounds2
             }
             if (!bounds2) {
@@ -31,10 +31,10 @@ export class HtmlPageBreak {
 
         const NO_PAGE_ITEMS: HTMLElement[] = [];
         const calculateNewBounds = (element: HTMLElement, bounds?: DOMRect): DOMRect | undefined => {
-            if(element.classList.contains(HIDE_NEXT_PAGE_ITEM_CLASS)) {
+            if (element.classList.contains(HIDE_NEXT_PAGE_ITEM_CLASS)) {
                 return bounds; // Skip elements already marked for hiding
             }
-            if(element.children.length === 0) {
+            if (element.children.length === 0) {
                 // If no children, check if element is completely within the page height
                 const elementBounds = element.getBoundingClientRect();
                 bounds = getUnionOfBounds(bounds, elementBounds);
@@ -78,7 +78,9 @@ export class HtmlPageBreak {
                 const overlap = finalPageHeight - elementTop;
                 const elementHeight = bounds.height;
                 if (this.shouldTreatAsSingleElement(element)
-                    || (this.shouldCheckForOverlap(element) && overlap < (elementHeight * 0.2))) { // Less than 20% overlap
+                    || (this.shouldCheckForOverlap(element)
+                        && overlap < (elementHeight * 0.2)
+                        && overlap < (this.pageHeight * 0.4))) { // Less than 20% overlap
                     element.classList.add(HIDE_NEXT_PAGE_ITEM_CLASS);
                     // Reduce page height to top of element
                     finalPageHeight = Math.min(finalPageHeight, elementTop);
@@ -94,7 +96,7 @@ export class HtmlPageBreak {
                     if (this.shouldCheckForOverlap(element)) {
                         const newBounds = calculateNewBounds(element);
                         if (newBounds) {
-                            if(newBounds.height < (elementHeight * 0.2)) {
+                            if (newBounds.height < (elementHeight * 0.2) && newBounds.height < (this.pageHeight * 0.4)) {
                                 element.classList.add(HIDE_NEXT_PAGE_ITEM_CLASS); // Hide next page item
                                 finalPageHeight = Math.min(finalPageHeight, newBounds.top); // Reduce page height
                                 return NO_PAGE_ITEMS; // Stop iteration
@@ -113,7 +115,7 @@ export class HtmlPageBreak {
             this.pageItems.push(...processElement(child));
         }
 
-        if(this.pageItems.length === 0) {
+        if (this.pageItems.length === 0) {
             return null; // No items to process
         }
         return this.document.body; // Return body as the processed page
@@ -121,24 +123,24 @@ export class HtmlPageBreak {
 
     protected shouldTreatAsSingleElement(element: HTMLElement): boolean {
         // Override this method to implement custom logic
-        
+
         const computedStyle = window.getComputedStyle(element);
         if (computedStyle.display === 'flex' || computedStyle.display === 'inline-flex') {
             return true;
         }
         const tagName = element.tagName.toLowerCase();
-        if(/h[1-9]/.test(tagName)) {
+        if (/h[1-9]/.test(tagName)) {
             return true; // Treat headings as single elements
         }
         return tagName === 'img' || tagName === 'svg' || tagName === 'canvas' || tagName === 'video' ||
-            tagName === 'audio' || tagName === 'picture' ||                                
+            tagName === 'audio' || tagName === 'picture' ||
             element.classList.contains('no-break');
     }
 
     protected shouldCheckForOverlap(element: HTMLElement): boolean {
         const tagName = element.tagName.toLowerCase();
         // Check if the element is a block-level element or has a specific tag that requires overlap checking
-        if (tagName === 'p' || tagName === 'section' ||tagName === 'table' ) {
+        if (tagName === 'p' || tagName === 'section' || tagName === 'table') {
             return true;
         }
         // Override this method to implement custom logic
