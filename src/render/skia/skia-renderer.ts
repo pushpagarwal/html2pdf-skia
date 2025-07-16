@@ -244,7 +244,7 @@ export class SkiaRenderer {
     }
 
     renderTextWithLetterSpacing(text: TextBounds, letterSpacing: number, baseline: number, paint: SkiaPaint, font: SkiaFont): void {
-        if (letterSpacing === 0) {
+        if (letterSpacing === 0 && !this.areGlyphsMissing(font, text.text)) {
             this.canvas.drawText(text.text, text.bounds.left, text.bounds.top + baseline, paint, font);
         } else {
             const letters = segmentGraphemes(text.text);
@@ -428,6 +428,7 @@ export class SkiaRenderer {
                                     this.renderTextWithLetterSpacing(textBounds, styles.letterSpacing, baseline, shadowPaint, font);
                                     this.canvas.restore();
                                     shadowPaint.delete();
+                                    blurEffect.delete();
                                 });
                         }
 
@@ -1117,6 +1118,7 @@ export class SkiaRenderer {
 
                     shadowPaint.delete();
                     shadowPath.delete();
+                    blurEffect.delete();
                     this.canvas.restore();
                 });
         }
@@ -1218,12 +1220,15 @@ export class SkiaRenderer {
                     : maxSpace;
         }
 
+        let pathEffect;
         if (style === 3 /* BORDER_STYLE.DOTTED */) {
             paint.setStrokeWidth(width);
-            paint.setPathEffect(this.canvasKit.PathEffect.MakeDash([0, dashLength + spaceLength], 0));
+            pathEffect = this.canvasKit.PathEffect.MakeDash([0, dashLength + spaceLength], 0);
+            paint.setPathEffect(pathEffect);
         } else {
             paint.setStrokeWidth(width * 2 + 1.1);
-            paint.setPathEffect(this.canvasKit.PathEffect.MakeDash([dashLength, spaceLength], 0));
+            pathEffect = this.canvasKit.PathEffect.MakeDash([dashLength, spaceLength], 0);
+            paint.setPathEffect(pathEffect);
         }
 
         const strokePath = style === 3 /* BORDER_STYLE.DOTTED */ ?
@@ -1234,6 +1239,7 @@ export class SkiaRenderer {
 
         paint.delete();
         strokePath.delete();
+        pathEffect?.delete();
         this.canvas.restore();
     }
 
