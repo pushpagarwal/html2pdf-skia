@@ -2,6 +2,7 @@ import { CanvasKit, FontMgr, PDFMetadata, PDFTag } from "canvaskit-wasm";
 import { parseBackgroundColor, parseTree } from "../dom/node-parser";
 import { Context } from "../core/context";
 import { SkiaRenderer } from "../render/skia/skia-renderer";
+import { FallbackFontProvider, IFallbackFontConfig } from "./font-fallback";
 
 export interface IPageSize {
     width: number;
@@ -26,6 +27,7 @@ export interface IPdfOptions {
     language?: string;
     pageSize: { width: number; height: number };
     fontLoader: FontLoader;
+    fallbackFonts?: IFallbackFontConfig;
 }
 
 export async function exportToPdf(
@@ -90,6 +92,7 @@ export async function exportToPdf(
             width: pageWidth * window.devicePixelRatio,
             height: pageHeight * window.devicePixelRatio,
             backgroundColor: backgroundColor,
+            fallbackFontProvider: pdfOptions?.fallbackFonts ? new FallbackFontProvider(canvasKit, pdfOptions.fallbackFonts) : undefined,
         });
         await renderer.render(elementContainer);
         canvas.restore();

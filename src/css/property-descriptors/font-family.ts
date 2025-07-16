@@ -36,8 +36,6 @@ export const fontFamily: IPropertyListDescriptor<FontFamily> = {
     if (accumulator.length) {
       results.push(accumulator.join(" "));
     }
-    return results.map((result) =>
-      result.indexOf(" ") === -1 ? result : `'${result}'`
-    );
+    return results;
   },
 };

@@ -68,7 +68,8 @@ export const parseTextBounds = (
     offset += text.length;
   });
 
-  return textBounds;
+  // Filter out empty bounds
+  return textBounds.filter((tb => tb.bounds.width > 0 || tb.bounds.height > 0));
 };
 
 const getWrapperBounds = (context: Context, node: Text): Bounds => {
