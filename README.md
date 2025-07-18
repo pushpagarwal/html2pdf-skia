@@ -134,63 +134,162 @@ const pdfBlob = await exportHTMLDocumentToPdf(canvasKit, tempDocument, options);
 
 ## 🔤 Font Management and Fallback
 
-html2pdf-skia provides sophisticated font handling capabilities:
+html2pdf-skia provides a powerful font collection system that handles custom fonts, fallbacks, and missing glyph detection:
 
-### Custom Font Loading
+### Using Font Collections
 
 ```typescript
-const options = {
-  fontLoader: async (fontFamilies: string[]) => {
-    const fontBuffers: ArrayBuffer[] = [];
+import { createFontCollection } from 'html2pdf-skia';
+import { loadCanvasKit } from 'html2pdf-skia/canvaskit-loader';
+
+async function generatePDFWithFonts() {
+  const canvasKit = await loadCanvasKit({
+    wasmBinaryUrl: '/canvaskit.wasm'
+  });
+
+  // Create a font collection
+  const fontCollection = createFontCollection(canvasKit);
+
+  // Load custom fonts
+  const robotoBuffer = await fetch('/fonts/Roboto-Regular.ttf').then(r => r.arrayBuffer());
+  const robotoBoldBuffer = await fetch('/fonts/Roboto-Bold.ttf').then(r => r.arrayBuffer());
+  
+  // Add fonts to the collection
+  fontCollection.addFont(robotoBuffer, 'Roboto');
+  fontCollection.addFont(robotoBoldBuffer, 'Roboto', { fontWeight: 700 });
+
+  // Set default fonts for font families
+  fontCollection.setDefaultFonts('sans-serif', ['Roboto', 'Arial', 'Helvetica']);
+  fontCollection.setDefaultFonts('serif', ['Times New Roman', 'Georgia']);
+
+  // Generate PDF with font collection
+  const pdfBlob = await exportHTMLDocumentToPdf(canvasKit, document, {
+    fontCollection: fontCollection,
+    pageSize: { width: 595, height: 842 }
+  });
+
+  return pdfBlob;
+}
+```
+
+### Advanced Font Configuration
+
+```typescript
+import { createFontCollection, type IFontCollection } from 'html2pdf-skia';
+
+async function setupAdvancedFonts(canvasKit: CanvasKit): Promise<IFontCollection> {
+  const fontCollection = createFontCollection(canvasKit);
+
+  // Load multiple font weights and styles
+  const fontConfig = [
+    { url: '/fonts/Inter-Regular.woff2', family: 'Inter', weight: 400 },
+    { url: '/fonts/Inter-Medium.woff2', family: 'Inter', weight: 500 },
+    { url: '/fonts/Inter-Bold.woff2', family: 'Inter', weight: 700 },
+    { url: '/fonts/Inter-Italic.woff2', family: 'Inter', weight: 400, slant: 'italic' },
+    { url: '/fonts/JetBrainsMono-Regular.woff2', family: 'JetBrains Mono', weight: 400 },
+    { url: '/fonts/NotoColorEmoji.ttf', family: 'Noto Color Emoji' }
+  ];
+
+  // Load all fonts
+  for (const config of fontConfig) {
+    try {
+      const buffer = await fetch(config.url).then(r => r.arrayBuffer());
+      fontCollection.addFont(buffer, config.family, {
+        fontWeight: config.weight,
+        fontSlant: config.slant as 'normal' | 'italic' | 'oblique'
+      });
+    } catch (error) {
+      console.warn(`Failed to load font ${config.family}:`, error);
+    }
+  }
+
+  // Configure font family defaults
+  fontCollection.setDefaultFonts('sans-serif', ['Inter', 'Arial', 'Helvetica']);
+  fontCollection.setDefaultFonts('monospace', ['JetBrains Mono', 'Courier New', 'Monaco']);
+  fontCollection.setDefaultFonts('serif', ['Times New Roman', 'Georgia']);
+
+  return fontCollection;
+}
+```
+
+### Font Detection and Missing Glyph Analysis
+
+```typescript
+// Analyze document for missing fonts and glyphs
+function analyzeFontRequirements(fontCollection: IFontCollection, element: HTMLElement) {
+  // Get missing fonts for the element
+  const missingFonts = fontCollection.getMissingFonts(element);
+  if (missingFonts.length > 0) {
+    console.log('Missing fonts:', missingFonts.map(f => f.families.join(', ')));
+  }
+
+  // Get missing glyph categories
+  const missingGlyphCategories = fontCollection.getMissingGlyphsCategories(element, {});
+  if (missingGlyphCategories.length > 0) {
+    console.log('Missing glyph categories:', missingGlyphCategories);
     
-    for (const family of fontFamilies) {
-      try {
-        // Load font from your server or CDN
-        const response = await fetch(`/fonts/${family}.woff2`);
-        if (response.ok) {
-          fontBuffers.push(await response.arrayBuffer());
-        }
-      } catch (error) {
-        console.warn(`Failed to load font: ${family}`);
+    // Handle missing categories
+    for (const category of missingGlyphCategories) {
+      switch (category) {
+        case 'emoji':
+          console.warn('Consider adding emoji font fallbacks');
+          break;
+        case 'cjk':
+          console.warn('Consider adding CJK (Chinese/Japanese/Korean) font fallbacks');
+          break;
+        case 'symbol':
+          console.warn('Consider adding symbol font fallbacks');
+          break;
       }
     }
-    
-    return fontBuffers;
   }
-};
+}
 ```
 
-### Font Fallback Configuration
+### Font Collection API Reference
+
+The `IFontCollection` interface provides these methods:
+
+#### `addFont(buffer: ArrayBuffer, family: string, fontStyle?: IFontStyle): void`
+Adds a font buffer to the collection.
+
+#### `setDefaultFonts(fontFamilyClass: FontFamilyClass, families: string[]): void`
+Sets default fonts for CSS font family classes:
+- `'serif'` | `'sans-serif'` | `'monospace'` | `'cursive'` | `'fantasy'` | `'fangsong'`
+
+#### `getMissingFonts(element: HTMLElement): IFontProperties[]`
+Analyzes an HTML element and returns missing font properties.
+
+#### `getMissingGlyphsCategories(element: HTMLElement, fontStyle: IFontStyle): string[]`
+Detects which Unicode character categories have missing glyphs:
+- `'cjk'` - Chinese, Japanese, Korean characters
+- `'emoji'` - Emoji characters
+- `'symbol'` - Mathematical symbols, arrows, etc.
+- `'unicode'` - General Unicode fallback
+
+### Font Style Configuration
 
 ```typescript
-const options = {
-  fallbackFonts: {
-    // Define fallback chains for different font categories
-    'Roboto': ['Roboto', 'Arial', 'Helvetica', 'sans-serif'],
-    'Open Sans': ['Open Sans', 'Arial', 'Helvetica', 'sans-serif'],
-    'Playfair Display': ['Playfair Display', 'Georgia', 'serif'],
-    
-    // System font fallbacks
-    'sans-serif': ['Arial', 'Helvetica', 'Segoe UI', 'DejaVu Sans'],
-    'serif': ['Times New Roman', 'Georgia', 'DejaVu Serif'],
-    'monospace': ['Courier New', 'Monaco', 'Consolas', 'DejaVu Sans Mono'],
-    
-    // International and emoji support
-    'emoji': ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji'],
-    'chinese': ['Microsoft YaHei', 'SimHei', 'STHeiti'],
-    'japanese': ['Hiragino Sans', 'Yu Gothic', 'Meiryo'],
-    'korean': ['Malgun Gothic', 'Dotum', 'AppleGothic']
-  }
-};
+interface IFontStyle {
+  fontWeight?: number;    // 100-900 (default: 400)
+  fontWidth?: 'normal' | 'narrow' | 'wide';
+  fontSlant?: 'normal' | 'italic' | 'oblique';
+}
+
+interface IFontProperties extends IFontStyle {
+  families: string[];     // Font family names in priority order
+}
 ```
 
-### Automatic Font Detection
+### Automatic Features
 
-The library automatically:
-- Scans your document for used fonts
-- Attempts to load them via the `fontLoader` function
-- Falls back to system fonts when custom fonts aren't available
-- Handles missing glyphs gracefully with fallback fonts
+The font collection system automatically:
+- **Scans documents** for used fonts and styles
+- **Detects missing glyphs** by analyzing text content against available typefaces
+- **Categorizes missing characters** into Unicode buckets for targeted fallback loading
+- **Provides fallback typefaces** when primary fonts don't contain required glyphs
+- **Handles international text** including CJK characters, emojis, and symbols
+- **Optimizes performance** by caching font managers and typeface instances
 
 ## 📐 Page Configuration
 
