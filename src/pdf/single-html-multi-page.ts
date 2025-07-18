@@ -1,8 +1,7 @@
-import { PDFTag, FontMgr, CanvasKit } from "canvaskit-wasm";
-import { exportToPdf, FontLoader, IPageSize, IPdfInputProvider, IPdfOptions } from "./pdf-export";
+import { PDFTag, CanvasKit } from "@rollerbird/canvaskit-wasm-pdf";
+import { exportToPdf, IPageSize, IPdfInputProvider, IPdfOptions } from "./pdf-export";
 import { applyPDFStructureToDocument } from "./document-structure";
 import { HtmlPageBreak } from "./html-page-break";
-import { enumerateFonts } from "./font-enumeration";
 import {
   CloneConfigurations,
   DocumentCloner,
@@ -17,12 +16,10 @@ export class SingleHtmlMultiPageProvider implements IPdfInputProvider {
     private document: Document;
     private currentPageIndex: number = 0;
     private htmlPageBreak: HtmlPageBreak;
-    private fontLoader: (fontList: string[]) => Promise<FontMgr>;
 
-    constructor(document: Document, pageSize: IPageSize, fontLoader: (fontList: string[]) => Promise<FontMgr>) {
+    constructor(document: Document, pageSize: IPageSize) {
         this.document = document;
         this.htmlPageBreak = new HtmlPageBreak(document, pageSize.height);
-        this.fontLoader = fontLoader;
     }
 
     getDocumentStructure(): PDFTag {
@@ -30,11 +27,7 @@ export class SingleHtmlMultiPageProvider implements IPdfInputProvider {
         return structure.structure;
     }
 
-    async getFontManager(): Promise<FontMgr> {
-        const fontFamilies = enumerateFonts([this.document.body]);
-        return this.fontLoader(Array.from(fontFamilies));
-    }
-
+    
     async getNextPageElement(): Promise<HTMLElement | null> {
         if(this.currentPageIndex > 0){
             this.htmlPageBreak.postProcess(); // Post process to handle previous page items
@@ -68,20 +61,6 @@ function getContextOptions(
 
 export type ExportPdfOptions = ContextOptions & IPdfOptions;
 
-const getFontLoader = (canvasKit: CanvasKit, fontLoader?: FontLoader): (familyNames: string[]) => Promise<FontMgr> => {
-    let fontMgr: FontMgr | null = null;
-    if(fontLoader) {
-        return async (fontList: string[]) => {
-            const fontBuffers = await fontLoader(fontList);
-            fontMgr = canvasKit.FontMgr.FromData(...fontBuffers);
-            return fontMgr ?? canvasKit.TypefaceFontProvider.Make();
-        };       
-    }
-
-    return (_:string[]) => Promise.resolve(canvasKit.TypefaceFontProvider.Make());
-};
-
-
 export async function exportHTMLDocumentToPdf(
     canvasKit: CanvasKit,
     document: Document,
@@ -108,10 +87,9 @@ export async function exportHTMLDocumentToPdf(
    };
    const container = await documentCloner.toIFrame(document, new Bounds(0, 0, devicePageSize.width, devicePageSize.height));
    appendPageStyles(clonedElement.ownerDocument);
-   const fontLoader = getFontLoader(canvasKit, options.fontLoader);
    const iframeDocument = clonedElement.ownerDocument;
    iframeDocument.title = document.title || "Document";
-   const pdfInputProvider = new SingleHtmlMultiPageProvider(iframeDocument, devicePageSize, fontLoader);
+   const pdfInputProvider = new SingleHtmlMultiPageProvider(iframeDocument, devicePageSize);
    const blob = await exportToPdf(
        canvasKit,
        context,

@@ -8,9 +8,8 @@ import {
     Image as SkiaImage,
     Font as SkiaFont,
     Typeface,
-    FontStyle,
-    FontMgr
-} from 'canvaskit-wasm';
+    FontMgr,
+} from '@rollerbird/canvaskit-wasm-pdf';
 
 import { ElementPaint, parseStackingContexts, StackingContext } from '../stacking-context';
 import { Color } from '../../css/types/color';
@@ -52,11 +51,12 @@ import { SelectElementContainer } from '../../dom/elements/select-element-contai
 import { IFrameElementContainer } from '../../dom/replaced-elements/iframe-element-container';
 import { TextShadow } from '../../css/property-descriptors/text-shadow';
 import { Context } from '../../core/context';
+import { SkiaFontCollection } from '../../fonts/font-collection';
+import { FontFamilyClass, FontStylePojo } from '../../fonts/interfaces';
 
 export interface CanvasKitConfig {
     canvasKit: CanvasKit;
     canvas: SkiaCanvas;
-    fontProvider: FontMgr;
 }
 
 export interface SkiaRenderOptions {
@@ -65,11 +65,9 @@ export interface SkiaRenderOptions {
     y: number;
     width: number;
     height: number;
-}
-
-export type SkiaRenderConfigurations = SkiaRenderOptions & {
     backgroundColor: Color | null;
-};
+    fontCollection: SkiaFontCollection;
+}
 
 const MASK_OFFSET = 10000;
 
@@ -79,7 +77,7 @@ const MASK_OFFSET = 10000;
 export interface ParsedFontInfo {
     fontFamily: string[];
     fontSize: number;
-    fontStyle: FontStyle;
+    fontStyle: FontStylePojo;
     fontVariant: string;
 }
 
@@ -110,11 +108,11 @@ export class SkiaRenderer {
     private readonly fontProvider: FontMgr;
     private readonly globalAlpha: GlobalAlpha = new GlobalAlpha();
 
-    constructor(private context: Context, ckConfig: CanvasKitConfig, private options: SkiaRenderConfigurations) {
+    constructor(private context: Context, ckConfig: CanvasKitConfig, private options: SkiaRenderOptions) {
         this.canvas = ckConfig.canvas;
         this.canvasKit = ckConfig.canvasKit;
         this.fontMetrics = new FontMetrics(document);
-        this.fontProvider = ckConfig.fontProvider;
+        this.fontProvider = options.fontCollection.fontMgr;
         this.canvas.scale(options.scale, options.scale);
         this.canvas.translate(-options.x, -options.y);
         this._activeEffects = [];
@@ -245,15 +243,25 @@ export class SkiaRenderer {
     }
 
     renderTextWithLetterSpacing(text: TextBounds, letterSpacing: number, baseline: number, paint: SkiaPaint, font: SkiaFont): void {
-        if (letterSpacing === 0) {
+        if (letterSpacing === 0 && !this.areGlyphsMissing(font, text.text)) {
             this.canvas.drawText(text.text, text.bounds.left, text.bounds.top + baseline, paint, font);
         } else {
             const letters = segmentGraphemes(text.text);
             letters.reduce((left, letter) => {
-                this.canvas.drawText(letter, left, text.bounds.top + baseline, paint, font);
-                // Calculate text width using CanvasKit's text measurement
+                let fallbackFont = null;
                 const glyphIDs = font.getGlyphIDs(letter);
-                const widths = font.getGlyphWidths(glyphIDs, paint);
+                if (glyphIDs.length === 0 || glyphIDs.some(id => id === 0)) {   
+                    // If glyphs are missing, use fallback font
+                    const typeface = this.options.fontCollection.getFallbackFontTypeface(letter, {});
+                    if (typeface) {
+                        fallbackFont = new this.canvasKit.Font(typeface, font.getSize());
+                    }
+                }
+                const finalFont = fallbackFont ?? font;
+                this.canvas.drawText(letter, left, text.bounds.top + baseline, paint, finalFont);
+                // Calculate text width using CanvasKit's text measurement
+                const widths = finalFont.getGlyphWidths(glyphIDs, paint);
+                fallbackFont?.delete();
                 const letterWidth = widths.length > 0 ? widths[0] : 0;
                 return left + letterWidth + letterSpacing;
             }, text.bounds.left);
@@ -281,10 +289,10 @@ export class SkiaRenderer {
         const fontSlant = this.mapCSSFontStyleToSkia(styles.fontStyle);
 
         // Handle font-variant mapping to style name if needed
-        const skiaFontStyle: FontStyle = {
+        const skiaFontStyle: FontStylePojo = {
             weight: fontWeight,
-            slant: fontSlant,
-            // CanvasKit doesn't have direct width support in FontStyle, using default
+            width: 0, // CanvasKit doesn't have direct width support in FontStyle, using default
+            slant: fontSlant
         };
 
         return {
@@ -300,34 +308,25 @@ export class SkiaRenderer {
      */
     private mapCSSFontWeightToSkia(fontWeight: string | number): any {
         if (typeof fontWeight === 'number') {
-            if (fontWeight <= 100) return this.canvasKit.FontWeight?.Thin || this.canvasKit.FontWeight?.Normal;
-            if (fontWeight <= 200) return this.canvasKit.FontWeight?.ExtraLight || this.canvasKit.FontWeight?.Normal;
-            if (fontWeight <= 300) return this.canvasKit.FontWeight?.Light || this.canvasKit.FontWeight?.Normal;
-            if (fontWeight <= 400) return this.canvasKit.FontWeight?.Normal;
-            if (fontWeight <= 500) return this.canvasKit.FontWeight?.Medium || this.canvasKit.FontWeight?.Normal;
-            if (fontWeight <= 600) return this.canvasKit.FontWeight?.SemiBold || this.canvasKit.FontWeight?.Bold;
-            if (fontWeight <= 700) return this.canvasKit.FontWeight?.Bold;
-            if (fontWeight <= 800) return this.canvasKit.FontWeight?.ExtraBold || this.canvasKit.FontWeight?.Bold;
-            if (fontWeight <= 900) return this.canvasKit.FontWeight?.Black || this.canvasKit.FontWeight?.Bold;
-            return this.canvasKit.FontWeight?.ExtraBlack || this.canvasKit.FontWeight?.Bold;
+            return fontWeight;
         }
 
         switch (fontWeight.toLowerCase()) {
-            case 'thin': return this.canvasKit.FontWeight?.Thin || this.canvasKit.FontWeight?.Normal;
+            case 'thin': return 100;
             case 'extralight':
-            case 'extra-light': return this.canvasKit.FontWeight?.ExtraLight || this.canvasKit.FontWeight?.Normal;
-            case 'light': return this.canvasKit.FontWeight?.Light || this.canvasKit.FontWeight?.Normal;
-            case 'normal': return this.canvasKit.FontWeight?.Normal;
-            case 'medium': return this.canvasKit.FontWeight?.Medium || this.canvasKit.FontWeight?.Normal;
+            case 'extra-light': return 200;
+            case 'light': return 300;
+            case 'normal': return 400;
+            case 'medium': return 500;
             case 'semibold':
-            case 'semi-bold': return this.canvasKit.FontWeight?.SemiBold || this.canvasKit.FontWeight?.Bold;
-            case 'bold': return this.canvasKit.FontWeight?.Bold;
+            case 'semi-bold': return 600;
+            case 'bold': return 700;
             case 'extrabold':
-            case 'extra-bold': return this.canvasKit.FontWeight?.ExtraBold || this.canvasKit.FontWeight?.Bold;
-            case 'black': return this.canvasKit.FontWeight?.Black || this.canvasKit.FontWeight?.Bold;
+            case 'extra-bold': return 800;
+            case 'black': return 900;
             case 'extrablack':
-            case 'extra-black': return this.canvasKit.FontWeight?.ExtraBlack || this.canvasKit.FontWeight?.Bold;
-            default: return this.canvasKit.FontWeight?.Normal;
+            case 'extra-black': return 1000;
+            default: return 400;
         }
     }
 
@@ -336,10 +335,10 @@ export class SkiaRenderer {
      */
     private mapCSSFontStyleToSkia(fontStyle: string): any {
         switch (fontStyle.toLowerCase()) {
-            case 'italic': return this.canvasKit.FontSlant?.Italic || this.canvasKit.FontSlant?.Upright;
-            case 'oblique': return this.canvasKit.FontSlant?.Oblique || this.canvasKit.FontSlant?.Italic || this.canvasKit.FontSlant?.Upright;
+            case 'italic': return 1;
+            case 'oblique': return 2;
             case 'normal':
-            default: return this.canvasKit.FontSlant?.Upright;
+            default: return 0;
         }
     }
 
@@ -355,9 +354,12 @@ export class SkiaRenderer {
 
         // Try to get a typeface for each font family until one is found
         let typeface: Typeface | null = null;
-        for (const family of [...fontInfo.fontFamily, 'Roboto']) {
+        const fallbackFontFamilyClasses = (['sans-serif', 'serif', 'monospace', 'cursive', 'fantasy', 'fangsong'] as FontFamilyClass[])
+            .filter(family => fontInfo.fontFamily.includes(family));
+        const fallbackFontFamilies = this.options.fontCollection.getFallbackFontFamilies(fallbackFontFamilyClasses);
+        for (const family of [...fontInfo.fontFamily, ...fallbackFontFamilies]) {
             try {
-                typeface = this.fontProvider.matchFamilyStyle(family, fontInfo.fontStyle);
+                typeface = this.fontProvider.matchFamilyStyle(family, fontInfo.fontStyle as any);
                 if (typeface) {
                     break;
                 }
@@ -378,9 +380,9 @@ export class SkiaRenderer {
         }
 
         return font;
-    }    
-    
-    async renderTextNode(text: TextContainer, styles: CSSParsedDeclaration): Promise<void> {
+    }
+
+    renderTextNode(text: TextContainer, styles: CSSParsedDeclaration): void {
         const font = this.createSkiaFont(styles);
         const { baseline, middle } = this.fontMetrics.getMetrics(styles.fontFamily.join(', '), styles.fontSize.number.toString());
         const paintOrder = styles.paintOrder;
@@ -419,6 +421,7 @@ export class SkiaRenderer {
                                     this.renderTextWithLetterSpacing(textBounds, styles.letterSpacing, baseline, shadowPaint, font);
                                     this.canvas.restore();
                                     shadowPaint.delete();
+                                    blurEffect.delete();
                                 });
                         }
 
@@ -517,13 +520,13 @@ export class SkiaRenderer {
             this.canvasKit.SetPDFTagId(this.canvas, container.pdfTagNodeId);
         }
         for (const child of container.textNodes) {
-                await this.renderTextNode(child, styles);
+            this.renderTextNode(child, styles);
         }
 
         if (container instanceof ImageElementContainer) {
             try {
                 const cachedImage = await this.context.cache.match(container.src);
-                const skiaImage = await this.convertCanvasImageSourceToSkia(cachedImage);
+                const skiaImage = this.convertCanvasImageSourceToSkia(cachedImage);
                 if (skiaImage) {
                     // Create simple curves from container bounds
                     const curves = new BoundCurves(container);
@@ -537,7 +540,7 @@ export class SkiaRenderer {
 
         if (container instanceof CanvasElementContainer) {
             try {
-                const skiaImage = await this.convertCanvasImageSourceToSkia(container.canvas);
+                const skiaImage = this.convertCanvasImageSourceToSkia(container.canvas);
                 if (skiaImage) {
                     const curves = new BoundCurves(container);
                     this.renderReplacedElement(container, curves, skiaImage);
@@ -594,14 +597,14 @@ export class SkiaRenderer {
             const iframeRenderer = new SkiaRenderer(this.context, {
                 canvasKit: this.canvasKit,
                 canvas: iframeCanvas,
-                fontProvider: this.fontProvider
             }, {
-                scale: (this.options as any).scale,
+                scale: this.options.scale,
                 backgroundColor: container.backgroundColor,
                 x: 0,
                 y: 0,
                 width: container.width,
-                height: container.height
+                height: container.height,
+                fontCollection: this.options.fontCollection
             });
 
             // Render the iframe content to the recorded canvas
@@ -705,7 +708,7 @@ export class SkiaRenderer {
                     const url = (img as CSSURLImage).url;
                     try {
                         const cachedImage = await this.context.cache.match(url);
-                        const skiaImage = await this.convertCanvasImageSourceToSkia(cachedImage);
+                        const skiaImage = this.convertCanvasImageSourceToSkia(cachedImage);
                         if (skiaImage) {
                             // Position the list marker image
                             const markerSize = Math.min(
@@ -739,10 +742,11 @@ export class SkiaRenderer {
                 const font = this.createSkiaFont(styles);
                 const listPaint = this.createPaint('fill');
                 listPaint.setColor(this.parseColorWithAlpha(styles.color));
-
+                const textBounds = container.textNodes[0]?.textBounds[0]?.bounds
+                    ?? container.elements[0]?.bounds; // Try to get bounds from first text node or element
                 const bounds = new Bounds(
-                    container.bounds.left,
-                    container.bounds.top + getAbsoluteValue(container.styles.paddingTop, container.bounds.width),
+                    container.bounds.left - 16, // Adjust left position for list marker
+                    textBounds?.top ?? container.bounds.top + getAbsoluteValue(container.styles.paddingTop, container.bounds.width),
                     container.bounds.width,
                     computeLineHeight(styles.lineHeight, styles.fontSize.number) / 2 + 1
                 );
@@ -877,7 +881,7 @@ export class SkiaRenderer {
                             cachedImage.height,
                             cachedImage.width / cachedImage.height
                         ]);
-                        const skiaImage = await this.convertCanvasImageSourceToSkia(this.resizeImage(cachedImage, width, height));
+                        const skiaImage = this.convertCanvasImageSourceToSkia(this.resizeImage(cachedImage, width, height));
                         if (skiaImage) {
                             const shader = skiaImage.makeShaderCubic(
                                 this.canvasKit.TileMode.Repeat,
@@ -991,7 +995,7 @@ export class SkiaRenderer {
         }
     }
 
-    async renderSolidBorder(color: Color, side: number, curvePoints: BoundCurves): Promise<void> {
+    renderSolidBorder(color: Color, side: number, curvePoints: BoundCurves): void {
         const path = this.createSkiaPath(parsePathForBorder(curvePoints, side));
         const paint = this.createPaint('fill');
         paint.setColor(this.parseColorWithAlpha(color));
@@ -1004,7 +1008,7 @@ export class SkiaRenderer {
 
     async renderDoubleBorder(color: Color, width: number, side: number, curvePoints: BoundCurves): Promise<void> {
         if (width < 3) {
-            await this.renderSolidBorder(color, side, curvePoints);
+            this.renderSolidBorder(color, side, curvePoints);
             return;
         }
 
@@ -1107,6 +1111,7 @@ export class SkiaRenderer {
 
                     shadowPaint.delete();
                     shadowPath.delete();
+                    blurEffect.delete();
                     this.canvas.restore();
                 });
         }
@@ -1115,7 +1120,7 @@ export class SkiaRenderer {
         for (const border of borders) {
             if (border.style !== 0 /* BORDER_STYLE.NONE */ && !isTransparent(border.color) && border.width > 0) {
                 if (border.style === 2 /* BORDER_STYLE.DASHED */) {
-                    await this.renderDashedDottedBorder(
+                    this.renderDashedDottedBorder(
                         border.color,
                         border.width,
                         side,
@@ -1123,7 +1128,7 @@ export class SkiaRenderer {
                         2 /* BORDER_STYLE.DASHED */
                     );
                 } else if (border.style === 3 /* BORDER_STYLE.DOTTED */) {
-                    await this.renderDashedDottedBorder(
+                    this.renderDashedDottedBorder(
                         border.color,
                         border.width,
                         side,
@@ -1133,20 +1138,20 @@ export class SkiaRenderer {
                 } else if (border.style === 4 /* BORDER_STYLE.DOUBLE */) {
                     await this.renderDoubleBorder(border.color, border.width, side, paint.curves);
                 } else {
-                    await this.renderSolidBorder(border.color, side, paint.curves);
+                    this.renderSolidBorder(border.color, side, paint.curves);
                 }
             }
             side++;
         }
     }
 
-    async renderDashedDottedBorder(
+    renderDashedDottedBorder(
         color: Color,
         width: number,
         side: number,
         curvePoints: BoundCurves,
         style: BORDER_STYLE
-    ): Promise<void> {
+    ): void {
         this.canvas.save();
 
         const strokePaths = parsePathForBorderStroke(curvePoints, side);
@@ -1208,12 +1213,15 @@ export class SkiaRenderer {
                     : maxSpace;
         }
 
+        let pathEffect;
         if (style === 3 /* BORDER_STYLE.DOTTED */) {
             paint.setStrokeWidth(width);
-            paint.setPathEffect(this.canvasKit.PathEffect.MakeDash([0, dashLength + spaceLength], 0));
+            pathEffect = this.canvasKit.PathEffect.MakeDash([0, dashLength + spaceLength], 0);
+            paint.setPathEffect(pathEffect);
         } else {
             paint.setStrokeWidth(width * 2 + 1.1);
-            paint.setPathEffect(this.canvasKit.PathEffect.MakeDash([dashLength, spaceLength], 0));
+            pathEffect = this.canvasKit.PathEffect.MakeDash([dashLength, spaceLength], 0);
+            paint.setPathEffect(pathEffect);
         }
 
         const strokePath = style === 3 /* BORDER_STYLE.DOTTED */ ?
@@ -1224,10 +1232,11 @@ export class SkiaRenderer {
 
         paint.delete();
         strokePath.delete();
+        pathEffect?.delete();
         this.canvas.restore();
     }
 
-    private async convertCanvasImageSourceToSkia(src: CanvasImageSource): Promise<SkiaImage | null> {
+    private convertCanvasImageSourceToSkia(src: CanvasImageSource): SkiaImage | null {
         try {
             // Use CanvasKit's MakeImageFromCanvasImageSource for direct conversion
             // Supports HTMLImageElement, HTMLCanvasElement, HTMLVideoElement, ImageBitmap, OffscreenCanvas
@@ -1337,6 +1346,11 @@ export class SkiaRenderer {
         const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
         ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, width, height);
         return canvas;
+    }
+    private areGlyphsMissing(font: SkiaFont, text: string): boolean {
+        // Check if the font has glyphs for the text
+        const glyphs = font.getGlyphIDs(text);
+        return glyphs.length === 0 || glyphs.some((glyph) => glyph === 0);
     }
 }
 

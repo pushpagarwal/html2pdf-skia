@@ -1,4 +1,4 @@
-import { PDFTag, PDFTagAttribute } from "canvaskit-wasm";
+import { PDFTag, PDFTagAttribute } from "@rollerbird/canvaskit-wasm-pdf";
 
 // Predefined special tag IDs from SkPDF
 export const PREDEFINED_TAG_IDS = {
