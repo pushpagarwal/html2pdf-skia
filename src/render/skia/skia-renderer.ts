@@ -8,9 +8,8 @@ import {
     Image as SkiaImage,
     Font as SkiaFont,
     Typeface,
-    FontStyle,
     FontMgr,
-} from 'canvaskit-wasm';
+} from '@rollerbird/canvaskit-wasm-pdf';
 
 import { ElementPaint, parseStackingContexts, StackingContext } from '../stacking-context';
 import { Color } from '../../css/types/color';
@@ -52,12 +51,12 @@ import { SelectElementContainer } from '../../dom/elements/select-element-contai
 import { IFrameElementContainer } from '../../dom/replaced-elements/iframe-element-container';
 import { TextShadow } from '../../css/property-descriptors/text-shadow';
 import { Context } from '../../core/context';
-import { FallbackFontProvider } from '../../pdf/font-fallback';
+import { SkiaFontCollection } from '../../fonts/font-collection';
+import { FontFamilyClass, FontStylePojo } from '../../fonts/interfaces';
 
 export interface CanvasKitConfig {
     canvasKit: CanvasKit;
     canvas: SkiaCanvas;
-    fontProvider: FontMgr;
 }
 
 export interface SkiaRenderOptions {
@@ -67,7 +66,7 @@ export interface SkiaRenderOptions {
     width: number;
     height: number;
     backgroundColor: Color | null;
-    fallbackFontProvider?: FallbackFontProvider;
+    fontCollection: SkiaFontCollection;
 }
 
 const MASK_OFFSET = 10000;
@@ -78,7 +77,7 @@ const MASK_OFFSET = 10000;
 export interface ParsedFontInfo {
     fontFamily: string[];
     fontSize: number;
-    fontStyle: FontStyle;
+    fontStyle: FontStylePojo;
     fontVariant: string;
 }
 
@@ -113,7 +112,7 @@ export class SkiaRenderer {
         this.canvas = ckConfig.canvas;
         this.canvasKit = ckConfig.canvasKit;
         this.fontMetrics = new FontMetrics(document);
-        this.fontProvider = ckConfig.fontProvider;
+        this.fontProvider = options.fontCollection.fontMgr;
         this.canvas.scale(options.scale, options.scale);
         this.canvas.translate(-options.x, -options.y);
         this._activeEffects = [];
@@ -253,8 +252,8 @@ export class SkiaRenderer {
                 const glyphIDs = font.getGlyphIDs(letter);
                 if (glyphIDs.length === 0 || glyphIDs.some(id => id === 0)) {   
                     // If glyphs are missing, use fallback font
-                    const typeface = this.options.fallbackFontProvider?.getFallbackFontTypeface(letter);
-                    if(typeface) {
+                    const typeface = this.options.fontCollection.getFallbackFontTypeface(letter, {});
+                    if (typeface) {
                         fallbackFont = new this.canvasKit.Font(typeface, font.getSize());
                     }
                 }
@@ -290,10 +289,10 @@ export class SkiaRenderer {
         const fontSlant = this.mapCSSFontStyleToSkia(styles.fontStyle);
 
         // Handle font-variant mapping to style name if needed
-        const skiaFontStyle: FontStyle = {
+        const skiaFontStyle: FontStylePojo = {
             weight: fontWeight,
-            slant: fontSlant,
-            // CanvasKit doesn't have direct width support in FontStyle, using default
+            width: 0, // CanvasKit doesn't have direct width support in FontStyle, using default
+            slant: fontSlant
         };
 
         return {
@@ -309,34 +308,25 @@ export class SkiaRenderer {
      */
     private mapCSSFontWeightToSkia(fontWeight: string | number): any {
         if (typeof fontWeight === 'number') {
-            if (fontWeight <= 100) return this.canvasKit.FontWeight?.Thin || this.canvasKit.FontWeight?.Normal;
-            if (fontWeight <= 200) return this.canvasKit.FontWeight?.ExtraLight || this.canvasKit.FontWeight?.Normal;
-            if (fontWeight <= 300) return this.canvasKit.FontWeight?.Light || this.canvasKit.FontWeight?.Normal;
-            if (fontWeight <= 400) return this.canvasKit.FontWeight?.Normal;
-            if (fontWeight <= 500) return this.canvasKit.FontWeight?.Medium || this.canvasKit.FontWeight?.Normal;
-            if (fontWeight <= 600) return this.canvasKit.FontWeight?.SemiBold || this.canvasKit.FontWeight?.Bold;
-            if (fontWeight <= 700) return this.canvasKit.FontWeight?.Bold;
-            if (fontWeight <= 800) return this.canvasKit.FontWeight?.ExtraBold || this.canvasKit.FontWeight?.Bold;
-            if (fontWeight <= 900) return this.canvasKit.FontWeight?.Black || this.canvasKit.FontWeight?.Bold;
-            return this.canvasKit.FontWeight?.ExtraBlack || this.canvasKit.FontWeight?.Bold;
+            return fontWeight;
         }
 
         switch (fontWeight.toLowerCase()) {
-            case 'thin': return this.canvasKit.FontWeight?.Thin || this.canvasKit.FontWeight?.Normal;
+            case 'thin': return 100;
             case 'extralight':
-            case 'extra-light': return this.canvasKit.FontWeight?.ExtraLight || this.canvasKit.FontWeight?.Normal;
-            case 'light': return this.canvasKit.FontWeight?.Light || this.canvasKit.FontWeight?.Normal;
-            case 'normal': return this.canvasKit.FontWeight?.Normal;
-            case 'medium': return this.canvasKit.FontWeight?.Medium || this.canvasKit.FontWeight?.Normal;
+            case 'extra-light': return 200;
+            case 'light': return 300;
+            case 'normal': return 400;
+            case 'medium': return 500;
             case 'semibold':
-            case 'semi-bold': return this.canvasKit.FontWeight?.SemiBold || this.canvasKit.FontWeight?.Bold;
-            case 'bold': return this.canvasKit.FontWeight?.Bold;
+            case 'semi-bold': return 600;
+            case 'bold': return 700;
             case 'extrabold':
-            case 'extra-bold': return this.canvasKit.FontWeight?.ExtraBold || this.canvasKit.FontWeight?.Bold;
-            case 'black': return this.canvasKit.FontWeight?.Black || this.canvasKit.FontWeight?.Bold;
+            case 'extra-bold': return 800;
+            case 'black': return 900;
             case 'extrablack':
-            case 'extra-black': return this.canvasKit.FontWeight?.ExtraBlack || this.canvasKit.FontWeight?.Bold;
-            default: return this.canvasKit.FontWeight?.Normal;
+            case 'extra-black': return 1000;
+            default: return 400;
         }
     }
 
@@ -345,10 +335,10 @@ export class SkiaRenderer {
      */
     private mapCSSFontStyleToSkia(fontStyle: string): any {
         switch (fontStyle.toLowerCase()) {
-            case 'italic': return this.canvasKit.FontSlant?.Italic || this.canvasKit.FontSlant?.Upright;
-            case 'oblique': return this.canvasKit.FontSlant?.Oblique || this.canvasKit.FontSlant?.Italic || this.canvasKit.FontSlant?.Upright;
+            case 'italic': return 1;
+            case 'oblique': return 2;
             case 'normal':
-            default: return this.canvasKit.FontSlant?.Upright;
+            default: return 0;
         }
     }
 
@@ -364,9 +354,12 @@ export class SkiaRenderer {
 
         // Try to get a typeface for each font family until one is found
         let typeface: Typeface | null = null;
-        for (const family of [...fontInfo.fontFamily, 'Roboto']) {
+        const fallbackFontFamilyClasses = (['sans-serif', 'serif', 'monospace', 'cursive', 'fantasy', 'fangsong'] as FontFamilyClass[])
+            .filter(family => fontInfo.fontFamily.includes(family));
+        const fallbackFontFamilies = this.options.fontCollection.getFallbackFontFamilies(fallbackFontFamilyClasses);
+        for (const family of [...fontInfo.fontFamily, ...fallbackFontFamilies]) {
             try {
-                typeface = this.fontProvider.matchFamilyStyle(family, fontInfo.fontStyle);
+                typeface = this.fontProvider.matchFamilyStyle(family, fontInfo.fontStyle as any);
                 if (typeface) {
                     break;
                 }
@@ -604,14 +597,14 @@ export class SkiaRenderer {
             const iframeRenderer = new SkiaRenderer(this.context, {
                 canvasKit: this.canvasKit,
                 canvas: iframeCanvas,
-                fontProvider: this.fontProvider
             }, {
-                scale: (this.options as any).scale,
+                scale: this.options.scale,
                 backgroundColor: container.backgroundColor,
                 x: 0,
                 y: 0,
                 width: container.width,
-                height: container.height
+                height: container.height,
+                fontCollection: this.options.fontCollection
             });
 
             // Render the iframe content to the recorded canvas

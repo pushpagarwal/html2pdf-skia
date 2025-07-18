@@ -1,8 +1,9 @@
-import { CanvasKit, FontMgr, PDFMetadata, PDFTag } from "canvaskit-wasm";
+import { CanvasKit, PDFMetadata, PDFTag } from "@rollerbird/canvaskit-wasm-pdf";
 import { parseBackgroundColor, parseTree } from "../dom/node-parser";
 import { Context } from "../core/context";
 import { SkiaRenderer } from "../render/skia/skia-renderer";
-import { FallbackFontProvider, IFallbackFontConfig } from "./font-fallback";
+import { IFontCollection } from "../fonts/interfaces";
+import { SkiaFontCollection } from "../fonts/font-collection";
 
 export interface IPageSize {
     width: number;
@@ -11,11 +12,9 @@ export interface IPageSize {
 export interface IPdfInputProvider {
     getDocumentTitle(): string;
     getDocumentStructure(): PDFTag;
-    getFontManager(): Promise<FontMgr>;
     getNextPageElement(): Promise<HTMLElement | null>;
 }
 
-export type FontLoader = (fontList: string[]) => Promise<ArrayBuffer[]>;
 
 export interface IPdfOptions {
     title: string;
@@ -26,8 +25,7 @@ export interface IPdfOptions {
     producer: string;
     language?: string;
     pageSize: { width: number; height: number };
-    fontLoader: FontLoader;
-    fallbackFonts?: IFallbackFontConfig;
+    fontCollection?: IFontCollection;
 }
 
 export async function exportToPdf(
@@ -46,10 +44,6 @@ export async function exportToPdf(
         language: pdfOptions?.language ?? "en-US",
         rootTag: rootTag,
     });
-    const fontManager = await inputProvider.getFontManager();
-    if (!fontManager) {
-        throw new Error("Font manager is not available");
-    }
     const stream = new canvasKit.DynamicMemoryStream();
     const pdfDocument = canvasKit.MakePDFDocument(stream, metadata);
     if (!pdfDocument) {
@@ -84,7 +78,6 @@ export async function exportToPdf(
             {
                 canvasKit,
                 canvas,
-                fontProvider: fontManager,
             }, {
             scale: 1,
             x: 0,
@@ -92,7 +85,7 @@ export async function exportToPdf(
             width: pageWidth * window.devicePixelRatio,
             height: pageHeight * window.devicePixelRatio,
             backgroundColor: backgroundColor,
-            fallbackFontProvider: pdfOptions?.fallbackFonts ? new FallbackFontProvider(canvasKit, pdfOptions.fallbackFonts) : undefined,
+            fontCollection: (pdfOptions?.fontCollection as SkiaFontCollection)?? new SkiaFontCollection(canvasKit),
         });
         await renderer.render(elementContainer);
         canvas.restore();

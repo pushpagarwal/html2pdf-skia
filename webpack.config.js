@@ -1,5 +1,6 @@
 const path = require('path');
 const TerserPlugin = require('terser-webpack-plugin');
+const CopyPlugin = require("copy-webpack-plugin");
 
 const baseConfig = {
     entry: './src/index.ts',
@@ -14,11 +15,22 @@ const baseConfig = {
     },
     resolve: {
         extensions: ['.ts', '.js'],
+        fallback: {
+            "fs": false,
+            "path": require.resolve("path-browserify")
+        }
     },
     externals: {
         // External dependencies that should not be bundled
     },
     devtool: 'source-map',
+    plugins: [
+    new CopyPlugin({
+      patterns: [
+        { from: "node_modules/@rollerbird/canvaskit-wasm-pdf/bin/canvaskit-pdf.wasm", to: "wasm" }
+      ],
+    }),
+  ]
 };
 
 // UMD build for browsers
@@ -26,7 +38,7 @@ const umdConfig = {
     ...baseConfig,
     output: {
         filename: 'html2pdf-skia.js',
-        path: path.resolve(__dirname, 'dist'),
+        path: path.resolve(__dirname, 'lib'),
         library: 'html2pdf',
         libraryTarget: 'umd',
         globalObject: 'this',
@@ -39,7 +51,7 @@ const umdMinConfig = {
     ...baseConfig,
     output: {
         filename: 'html2pdf-skia.min.js',
-        path: path.resolve(__dirname, 'dist'),
+        path: path.resolve(__dirname, 'lib'),
         library: 'html2pdf',
         libraryTarget: 'umd',
         globalObject: 'this',
@@ -65,7 +77,7 @@ const esmConfig = {
     ...baseConfig,
     output: {
         filename: 'html2pdf-skia.esm.js',
-        path: path.resolve(__dirname, 'dist'),
+        path: path.resolve(__dirname, 'lib'),
         library: {
             type: 'module',
         },
@@ -81,7 +93,7 @@ const cjsConfig = {
     ...baseConfig,
     output: {
         filename: 'html2pdf-skia.cjs.js',
-        path: path.resolve(__dirname, 'dist'),
+        path: path.resolve(__dirname, 'lib'),
         libraryTarget: 'commonjs2',
     },
     target: 'node',
