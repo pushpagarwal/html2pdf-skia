@@ -40,20 +40,27 @@ npm install html2pdf-skia
 ### Simple PDF Generation
 
 ```typescript
-import { exportHTMLDocumentToPdf } from 'html2pdf-skia';
+import { exportHTMLDocumentToPdf, createFontCollection } from 'html2pdf-skia';
 import { loadCanvasKit } from 'html2pdf-skia/canvaskit-loader';
 
 async function generatePDF() {
   // Load CanvasKit WASM module
   const canvasKit = await loadCanvasKit({
-    wasmBinaryUrl: '/path/to/canvaskit.wasm'
+    wasmBinaryUrl: '/path/to/canvaskit-pdf.wasm'
   });
+
+  // setup Font Collection, fonts and Fallback
+  const fontCollection = createFontCollection(canvasKit);
+  const robotoBuffer = await fetch('/fonts/Roboto-Regular.ttf').then(r => r.arrayBuffer());
+  fontCollection.addFont(robotoBuffer, 'Roboto');
+  fontCollection.setDefaultFonts('sans-serif', ['Roboto']);
 
   // Generate PDF from current document
   const pdfBlob = await exportHTMLDocumentToPdf(canvasKit, document, {
     pageSize: { width: 595, height: 842 }, // A4 size in points
     title: "My Document",
-    author: "John Doe"
+    author: "John Doe",
+    fontCollection
   });
 
   // Download the PDF
@@ -69,7 +76,7 @@ async function generatePDF() {
 ### Advanced Configuration
 
 ```typescript
-import { exportHTMLDocumentToPdf } from 'html2pdf-skia';
+import { exportHTMLDocumentToPdf, createFontCollection } from 'html2pdf-skia';
 import { loadCanvasKit } from 'html2pdf-skia/canvaskit-loader';
 
 async function generateAdvancedPDF() {
@@ -78,6 +85,12 @@ async function generateAdvancedPDF() {
     timeout: 10000,
     verbose: true
   });
+
+  // setup Font Collection, fonts and Fallback
+  const fontCollection = createFontCollection(canvasKit);
+  const robotoBuffer = await fetch('/fonts/Roboto-Regular.ttf').then(r => r.arrayBuffer());
+  fontCollection.addFont(robotoBuffer, 'Roboto');
+  fontCollection.setDefaultFonts('sans-serif', ['Roboto']);
 
   const pdfBlob = await exportHTMLDocumentToPdf(canvasKit, document, {
     // Page configuration
@@ -92,49 +105,16 @@ async function generateAdvancedPDF() {
     producer: "html2pdf-skia v1.0",
     language: "en-US",
     
-    // Rendering options
-    scale: 1,
-    useCORS: true,
-    allowTaint: false,
-    logging: true,
-    imageTimeout: 15000,
-    
-    // Font configuration
-    fontLoader: async (fontList) => {
-      // Load custom fonts
-      const fontBuffers = await Promise.all(
-        fontList.map(font => fetch(`/fonts/${font}.woff2`).then(r => r.arrayBuffer()))
-      );
-      return fontBuffers;
-    },
-    
-    // Font fallback configuration
-    fallbackFonts: {
-      'sans-serif': ['Arial', 'Helvetica', 'DejaVu Sans'],
-      'serif': ['Times New Roman', 'Georgia', 'DejaVu Serif'],
-      'monospace': ['Courier New', 'Monaco', 'DejaVu Sans Mono'],
-      'emoji': ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']
-    }
+    fontCollection
   });
 
   return pdfBlob;
 }
 ```
 
-### Targeting Specific Elements
-
-```typescript
-// Create a wrapper for specific content
-const element = document.getElementById('content-to-convert');
-const tempDocument = document.implementation.createHTMLDocument('PDF Content');
-tempDocument.body.appendChild(element.cloneNode(true));
-
-const pdfBlob = await exportHTMLDocumentToPdf(canvasKit, tempDocument, options);
-```
-
 ## 🔤 Font Management and Fallback
 
-html2pdf-skia provides a powerful font collection system that handles custom fonts, fallbacks, and missing glyph detection:
+Since Skia is a JS/WASM-based library and browsers don't provide access to local system fonts, it's the client's responsibility to provide font files. html2pdf-skia offers a powerful font collection system that handles custom fonts, fallbacks, and missing glyph detection:
 
 ### Using Font Collections
 
@@ -161,6 +141,10 @@ async function generatePDFWithFonts() {
   // Set default fonts for font families
   fontCollection.setDefaultFonts('sans-serif', ['Roboto', 'Arial', 'Helvetica']);
   fontCollection.setDefaultFonts('serif', ['Times New Roman', 'Georgia']);
+
+  // Set fallback fonts for Unicode character categories
+  fontCollection.setFallbackFonts('emoji', ['Apple Color Emoji', 'Segoe UI Emoji']);
+  fontCollection.setFallbackFonts('cjk', ['Microsoft YaHei', 'SimHei']);
 
   // Generate PDF with font collection
   const pdfBlob = await exportHTMLDocumentToPdf(canvasKit, document, {
@@ -207,6 +191,11 @@ async function setupAdvancedFonts(canvasKit: CanvasKit): Promise<IFontCollection
   fontCollection.setDefaultFonts('sans-serif', ['Inter', 'Arial', 'Helvetica']);
   fontCollection.setDefaultFonts('monospace', ['JetBrains Mono', 'Courier New', 'Monaco']);
   fontCollection.setDefaultFonts('serif', ['Times New Roman', 'Georgia']);
+
+  // Configure Unicode fallbacks
+  fontCollection.setFallbackFonts('emoji', ['Noto Color Emoji', 'Apple Color Emoji']);
+  fontCollection.setFallbackFonts('cjk', ['Microsoft YaHei', 'SimHei', 'STHeiti']);
+  fontCollection.setFallbackFonts('symbol', ['Arial Unicode MS', 'Segoe UI Symbol']);
 
   return fontCollection;
 }
@@ -256,6 +245,13 @@ Adds a font buffer to the collection.
 #### `setDefaultFonts(fontFamilyClass: FontFamilyClass, families: string[]): void`
 Sets default fonts for CSS font family classes:
 - `'serif'` | `'sans-serif'` | `'monospace'` | `'cursive'` | `'fantasy'` | `'fangsong'`
+
+#### `setFallbackFonts(unicodeCharacterBucket: UnicodeCharacterBucket, families: string[]): void`
+Sets fallback fonts for Unicode character categories:
+- `'cjk'` - Chinese, Japanese, Korean characters
+- `'emoji'` - Emoji characters
+- `'symbol'` - Mathematical symbols, arrows, etc.
+- `'unicode'` - General Unicode fallback
 
 #### `getMissingFonts(element: HTMLElement): IFontProperties[]`
 Analyzes an HTML element and returns missing font properties.
@@ -384,27 +380,24 @@ Loads the CanvasKit WASM module.
 ```typescript
 // Ensure correct WASM path
 const canvasKit = await loadCanvasKit({
-  wasmBinaryUrl: './node_modules/html2pdf-skia/dist/canvaskit.wasm'
+  wasmBinaryUrl: './node_modules/html2pdf-skia/lib/wasm/canvaskit-pdf.wasm'
 });
 ```
 
 **Font Loading Issues**
 ```typescript
-// Provide fallback fonts
-const options = {
-  fallbackFonts: {
-    'custom-font': ['Arial', 'sans-serif']
-  }
-};
+// Create font collection and add fallback fonts
+const fontCollection = createFontCollection(canvasKit);
+fontCollection.setDefaultFonts('sans-serif', ['Arial']);
+fontCollection.setFallbackFonts('emoji', ['Apple Color Emoji']);
 ```
 
 **Large Document Performance**
 ```typescript
-// Optimize for large documents
+// Use appropriate page sizes and optimize font loading
 const options = {
-  scale: 0.75,        // Reduce scale for faster processing
-  imageTimeout: 5000, // Reduce image timeout
-  logging: true       // Enable logging to track progress
+  pageSize: { width: 595, height: 842 }, // A4
+  fontCollection: fontCollection
 };
 ```
 
