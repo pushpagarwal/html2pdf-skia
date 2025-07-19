@@ -92,6 +92,7 @@ export async function exportToPdf(
         pdfDocument.endPage();
     }
     const buffer = pdfDocument.close();
+    pdfDocument.delete();
     return new Blob([buffer], { type: "application/pdf" });
 }
 
