@@ -34,7 +34,7 @@ export async function exportToPdf(
     inputProvider: IPdfInputProvider,
     pdfOptions?: Partial<IPdfOptions>): Promise<Blob> {
     const rootTag = inputProvider.getDocumentStructure();
-    const metadata: PDFMetadata = new canvasKit.PDFMetadata({
+    const metadata: PDFMetadata = {
         title: pdfOptions?.title ?? inputProvider.getDocumentTitle(),
         author: pdfOptions?.author ?? "",
         subject: pdfOptions?.subject ?? "",
@@ -43,9 +43,8 @@ export async function exportToPdf(
         producer: pdfOptions?.producer ?? "html2pdf-skia",
         language: pdfOptions?.language ?? "en-US",
         rootTag: rootTag,
-    });
-    const stream = new canvasKit.DynamicMemoryStream();
-    const pdfDocument = canvasKit.MakePDFDocument(stream, metadata);
+    };
+    const pdfDocument = canvasKit.MakePDFDocument(metadata);
     if (!pdfDocument) {
         throw new Error("Failed to create PDF document");
     }
@@ -92,8 +91,7 @@ export async function exportToPdf(
         // render the page content
         pdfDocument.endPage();
     }
-    pdfDocument.close();
-    const buffer = stream.detachAsBytes();
+    const buffer = pdfDocument.close();
     return new Blob([buffer], { type: "application/pdf" });
 }
 

@@ -5,7 +5,7 @@
   "module": "lib/html2pdf-skia.esm.js",
   "typings": "lib/types/index.d.ts",
   "browser": "lib/html2pdf-skia.js",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": {
     "name": "pushpagarwal",
     "email": "pushp.agarwal@gmail.com",
@@ -72,7 +72,7 @@
     "prepare": "if [ \"$SKIP_PREPARE\" != \"true\" ]; then husky install; fi"
   },
   "dependencies": {
-    "@rollerbird/canvaskit-wasm-pdf": "file:rollerbird-canvaskit-wasm-pdf-0.1.1.tgz",
+    "@rollerbird/canvaskit-wasm-pdf": "file:rollerbird-canvaskit-wasm-pdf-0.1.2.tgz",
     "css-line-break": "^2.1.0",
     "emoji-regex-xs": "^2.0.1",
     "text-segmentation": "^1.0.3"
