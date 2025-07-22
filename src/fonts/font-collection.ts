@@ -1,21 +1,37 @@
-import { CanvasKit, Typeface, TypefaceFontProvider } from "@rollerbird/canvaskit-wasm-pdf";
-import { FontFamilyClass, IFontCollection, IFontProperties, IFontStyle, UnicodeCharacterBucket } from "./interfaces";
+import { CanvasKit, Font, Typeface, TypefaceFontProvider } from "@rollerbird/canvaskit-wasm-pdf";
+import { FontFamilyClass, FontStylePojo, IFontCollection, IFontProperties, IFontStyle, UnicodeCharacterBucket } from "./interfaces";
 import { enumerateFonts, enumerateMissingGlyphs, getUnicodeCharacterBucket } from "./font-enumeration";
 import { toSkiaFontStyle } from "./font-style-mapping";
+
+
+interface IFontInfo {
+    family: string;
+    style: IFontStyle;
+    url?: string;
+    descriptors?: FontFaceDescriptors;
+    buffer: ArrayBuffer; // Optional buffer for font data
+}
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export class SkiaFontCollection implements IFontCollection {
     fontMgr: TypefaceFontProvider;
     private defaultFonts: Map<FontFamilyClass, string[]> = new Map();
     private fallbackFonts: Map<UnicodeCharacterBucket, string[]> = new Map();
     private families: Set<string> = new Set();
-
-    constructor(private canvasKit: CanvasKit) {
+    private fonts: IFontInfo[] = []; // Store font info for added fonts
+    private fontsCache: Map<string, Font> = new Map();
+    readonly emptyFont: Font;// Default empty font
+    constructor(public canvasKit: CanvasKit) {
         this.fontMgr = this.canvasKit.TypefaceFontProvider.Make();
+        this.emptyFont = new this.canvasKit.Font(); // Create an empty font instance
     }
 
-    addFont(buffer: ArrayBuffer, family: string, _fontStyle?: IFontStyle): void {
+    addFont(buffer: ArrayBuffer, family: string, fontStyle?: IFontStyle,
+            url?: string, descriptors?: FontFaceDescriptors): void {
         this.fontMgr.registerFont(buffer, family);
         this.families.add(family);
+        this.fonts.push({ family, style: fontStyle || {}, url, descriptors, buffer });
     }
 
     setDefaultFonts(fontFamilyClass: FontFamilyClass, families: string[]): void {
@@ -52,12 +68,11 @@ export class SkiaFontCollection implements IFontCollection {
         return enumerateMissingGlyphs(this.fontMgr, [element]);
     }
 
-    getFallbackFontTypeface(text: string, fontStyle: IFontStyle): Typeface | null {
+    getFallbackFontTypeface(text: string, fontStyle: FontStylePojo): Typeface | null {
         const key = getUnicodeCharacterBucket(text);
         const fallbackFontFamilies = this.fallbackFonts.get(key) || [];
-        const [_, style] = toSkiaFontStyle({...fontStyle, families:[]});
         for (const familyName of fallbackFontFamilies) {
-            const typeface = this.fontMgr.matchFamilyStyle(familyName, style as any);
+            const typeface = this.fontMgr.matchFamilyStyle(familyName, fontStyle as any);
             if (typeface && typeface.getGlyphIDs(text).filter(id => id !== 0).length > 0) {
                 return typeface;
             }
@@ -73,6 +88,44 @@ export class SkiaFontCollection implements IFontCollection {
             }
         }
         return fallbackFamilies;
+    }
+    async addFontsToDocument(cloneDocument: Document): Promise<void> {
+        await Promise.all(this.fonts.map(async (font) => {
+            const fontFace: FontFace = new FontFace(
+                        font.family,
+                        font.buffer,
+                        font.descriptors
+                    );
+            const loadedFace: FontFace = await fontFace.load();
+            cloneDocument.fonts.add(loadedFace);
+        }));
+        await cloneDocument.fonts.ready; // Ensure all fonts are loaded before proceeding
+        await delay(0); // Yield to allow font loading to complete
+    }
+    getFont(typeface: Typeface, fontSize: number): Font {
+        const cacheKey = `${(typeface as any).cb.lb}-${fontSize}`;
+        if (this.fontsCache.has(cacheKey)) {
+            return this.fontsCache.get(cacheKey)!;
+        }
+        const font = new this.canvasKit.Font();
+        font.setTypeface(typeface);
+        font.setSize(fontSize);
+        font.setLinearMetrics(true); // Enable linear metrics for better text rendering
+        this.fontsCache.set(cacheKey, font);
+        return font;
+    }
+    clearResources(): void {
+        this.fontsCache.forEach((font) => {
+            font.delete();
+        });
+        this.fontsCache.clear();
+        this.fonts = []; // Clear the font info array
+        this.defaultFonts.clear(); // Clear default fonts map
+        this.fallbackFonts.clear(); // Clear fallback fonts map
+        this.families.clear(); // Clear families set
+        this.fontMgr.delete(); // Delete the font manager instance
+        this.fontMgr.delete(); // Clean up the font provider
+        this.emptyFont.delete(); // Clear the empty font instance
     }
 }
 
