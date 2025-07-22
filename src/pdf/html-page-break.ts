@@ -1,5 +1,7 @@
 import { clearHideNextPageItems, HIDE_NEXT_PAGE_ITEM_CLASS, HIDE_PREVIOUS_PAGE_ITEM_CLASS } from "./dom-updates";
 
+const marginBottom = 36; // Default margin bottom for each page
+
 export class HtmlPageBreak {
     private document: Document;
     private pageHeight: number = 0;
@@ -11,7 +13,7 @@ export class HtmlPageBreak {
     }
 
     public processPage(): HTMLElement | null {
-        let finalPageHeight = this.pageHeight;
+        let finalPageHeight = this.pageHeight - marginBottom; // Adjust page height for margin
         this.pageItems = []; // Reset page items
 
         const getUnionOfBounds = (bounds1?: DOMRect, bounds2?: DOMRect): DOMRect | undefined => {
@@ -123,17 +125,12 @@ export class HtmlPageBreak {
 
     protected shouldTreatAsSingleElement(element: HTMLElement): boolean {
         // Override this method to implement custom logic
-
-        const computedStyle = window.getComputedStyle(element);
-        if (computedStyle.display === 'flex' || computedStyle.display === 'inline-flex') {
-            return true;
-        }
         const tagName = element.tagName.toLowerCase();
         if (/h[1-9]/.test(tagName)) {
             return true; // Treat headings as single elements
         }
         return tagName === 'img' || tagName === 'svg' || tagName === 'canvas' || tagName === 'video' ||
-            tagName === 'audio' || tagName === 'picture' ||
+            tagName === 'audio' || tagName === 'picture' || tagName === 'tr' ||
             element.classList.contains('no-break');
     }
 
@@ -145,14 +142,13 @@ export class HtmlPageBreak {
         }
         // Override this method to implement custom logic
         const computedStyle = window.getComputedStyle(element);
-        return computedStyle.display !== 'inline' && computedStyle.display !== 'inline-block' &&
-            computedStyle.display !== 'inline-flex' && computedStyle.display !== 'flex';
+        return computedStyle.display === 'inline' || computedStyle.display === 'inline-block' ||
+            computedStyle.display === 'inline-flex' || computedStyle.display === 'flex';
     }
 
     protected shouldRepeatOnEveryPage(element: HTMLElement): boolean {
         const tagName = element.tagName.toLowerCase();
-        return tagName === 'thead' || tagName === 'tfoot' ||
-            tagName === 'header' || tagName === 'footer';
+        return tagName === 'thead' || tagName === 'tfoot';
     }
     public postProcess(): void {
         // Add hide class to recorded page items

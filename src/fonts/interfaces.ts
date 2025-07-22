@@ -18,12 +18,14 @@ export type FontFamilyKey = FontFamilyClass | UnicodeCharacterBucket;
 
 
 export interface IFontCollection {
-   addFont(buffer: ArrayBuffer, family: string, fontStyle?: IFontStyle): void;
+   addFont(buffer: ArrayBuffer, family: string, fontStyle?: IFontStyle,
+    url?: string, descriptors?: FontFaceDescriptors): void;
    setDefaultFonts(fontFamilyClass: FontFamilyClass, families: string[]): void;
    setFallbackFonts(unicodeCharacterBucket: UnicodeCharacterBucket, families: string[]): void;
    
    getMissingFonts(element: HTMLElement): IFontProperties[];
    getMissingGlyphsCategories(element: HTMLElement, fontStyle: IFontStyle): string[];
+   clearResources(): void;
 }
 
 export interface FontStylePojo {

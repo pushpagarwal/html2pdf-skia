@@ -5,6 +5,7 @@ import { SkiaRenderer } from "../render/skia/skia-renderer";
 import { IFontCollection } from "../fonts/interfaces";
 import { SkiaFontCollection } from "../fonts/font-collection";
 
+export const defaultUserToPdfScale = 0.5; // Default scale for PDF rendering
 export interface IPageSize {
     width: number;
     height: number;
@@ -24,6 +25,7 @@ export interface IPdfOptions {
     creator: string;
     producer: string;
     language?: string;
+    userToPdfScale?: number;
     pageSize: { width: number; height: number };
     fontCollection?: IFontCollection;
 }
@@ -69,9 +71,10 @@ export async function exportToPdf(
             context,
             documentElement
         );
+        const userToPdfScale = pdfOptions?.userToPdfScale ?? defaultUserToPdfScale;
         const elementContainer = parseTree(context, nextPageElement);
         canvas.save();
-        canvas.scale(1 / window.devicePixelRatio, 1 / window.devicePixelRatio);
+        canvas.scale(userToPdfScale, userToPdfScale);
         const renderer = new SkiaRenderer(
             context,
             {
