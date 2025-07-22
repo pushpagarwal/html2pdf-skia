@@ -7,8 +7,6 @@ import {
     Shader as SkiaShader,
     Image as SkiaImage,
     Font as SkiaFont,
-    Typeface,
-    FontMgr,
 } from '@rollerbird/canvaskit-wasm-pdf';
 
 import { ElementPaint, parseStackingContexts, StackingContext } from '../stacking-context';
@@ -31,7 +29,6 @@ import {
     parsePathForBorderStroke
 } from '../border';
 import { calculateBackgroundRendering, getBackgroundValueForIndex } from '../background';
-import { isDimensionToken } from '../../css/syntax/parser';
 import { segmentGraphemes, TextBounds } from '../../css/layout/text';
 import { ImageElementContainer } from '../../dom/replaced-elements/image-element-container';
 import { contentBox } from '../box-sizing';
@@ -52,7 +49,7 @@ import { IFrameElementContainer } from '../../dom/replaced-elements/iframe-eleme
 import { TextShadow } from '../../css/property-descriptors/text-shadow';
 import { Context } from '../../core/context';
 import { SkiaFontCollection } from '../../fonts/font-collection';
-import { FontFamilyClass, FontStylePojo } from '../../fonts/interfaces';
+import { createSkiaFont } from './skia-font';
 
 export interface CanvasKitConfig {
     canvasKit: CanvasKit;
@@ -70,16 +67,6 @@ export interface SkiaRenderOptions {
 }
 
 const MASK_OFFSET = 10000;
-
-/**
- * Parsed font information from CSS styles
- */
-export interface ParsedFontInfo {
-    fontFamily: string[];
-    fontSize: number;
-    fontStyle: FontStylePojo;
-    fontVariant: string;
-}
 
 class GlobalAlpha {
     private stack: number[] = [];
@@ -105,14 +92,12 @@ export class SkiaRenderer {
     canvasKit: CanvasKit;
     private readonly _activeEffects: IElementEffect[] = [];
     private readonly fontMetrics: FontMetrics;
-    private readonly fontProvider: FontMgr;
     private readonly globalAlpha: GlobalAlpha = new GlobalAlpha();
 
     constructor(private context: Context, ckConfig: CanvasKitConfig, private options: SkiaRenderOptions) {
         this.canvas = ckConfig.canvas;
         this.canvasKit = ckConfig.canvasKit;
         this.fontMetrics = new FontMetrics(document);
-        this.fontProvider = options.fontCollection.fontMgr;
         this.canvas.scale(options.scale, options.scale);
         this.canvas.translate(-options.x, -options.y);
         this._activeEffects = [];
@@ -243,147 +228,29 @@ export class SkiaRenderer {
     }
 
     renderTextWithLetterSpacing(text: TextBounds, letterSpacing: number, baseline: number, paint: SkiaPaint, font: SkiaFont): void {
-        if (letterSpacing === 0 && !this.areGlyphsMissing(font, text.text)) {
-            this.canvas.drawText(text.text, text.bounds.left, text.bounds.top + baseline, paint, font);
+        if (letterSpacing === 0) {
+            let finalFont = text.font ?? font;
+            const glyphIDs = finalFont.getGlyphIDs(text.text);
+            const widths = finalFont.getGlyphWidths(glyphIDs, paint);
+            const totalWidth = widths.reduce((a, b) => a + b, 0);
+            console.log(`Drawing text: "${text.text}" in width  ${text.bounds.width} with glyphwidth ${totalWidth}`);
+            this.canvas.drawText(text.text, text.bounds.left, text.bounds.top + baseline, paint, text.font ?? font);
         } else {
             const letters = segmentGraphemes(text.text);
             letters.reduce((left, letter) => {
-                let fallbackFont = null;
-                const glyphIDs = font.getGlyphIDs(letter);
-                if (glyphIDs.length === 0 || glyphIDs.some(id => id === 0)) {   
-                    // If glyphs are missing, use fallback font
-                    const typeface = this.options.fontCollection.getFallbackFontTypeface(letter, {});
-                    if (typeface) {
-                        fallbackFont = new this.canvasKit.Font(typeface, font.getSize());
-                    }
-                }
-                const finalFont = fallbackFont ?? font;
+                const finalFont = text.font ?? font;
                 this.canvas.drawText(letter, left, text.bounds.top + baseline, paint, finalFont);
                 // Calculate text width using CanvasKit's text measurement
+                const glyphIDs = finalFont.getGlyphIDs(letter);
                 const widths = finalFont.getGlyphWidths(glyphIDs, paint);
-                fallbackFont?.delete();
                 const letterWidth = widths.length > 0 ? widths[0] : 0;
                 return left + letterWidth + letterSpacing;
             }, text.bounds.left);
         }
     }
 
-    /**
-     * Parse CSS font styles into Skia-compatible font information
-     */
-    private parseFontStyle(styles: CSSParsedDeclaration): ParsedFontInfo {
-        const fontVariant = styles.fontVariant
-            .filter((variant) => variant === 'normal' || variant === 'small-caps')
-            .join('');
-
-        const fontFamily = fixIOSSystemFonts(styles.fontFamily);
-
-        const fontSize = isDimensionToken(styles.fontSize)
-            ? styles.fontSize.number
-            : styles.fontSize.number;
-
-        // Convert CSS font-weight to Skia FontWeight
-        const fontWeight = this.mapCSSFontWeightToSkia(styles.fontWeight);
-
-        // Convert CSS font-style to Skia FontSlant
-        const fontSlant = this.mapCSSFontStyleToSkia(styles.fontStyle);
-
-        // Handle font-variant mapping to style name if needed
-        const skiaFontStyle: FontStylePojo = {
-            weight: fontWeight,
-            width: 0, // CanvasKit doesn't have direct width support in FontStyle, using default
-            slant: fontSlant
-        };
-
-        return {
-            fontFamily,
-            fontSize,
-            fontStyle: skiaFontStyle,
-            fontVariant
-        };
-    }
-
-    /**
-     * Map CSS font-weight values to Skia FontWeight
-     */
-    private mapCSSFontWeightToSkia(fontWeight: string | number): any {
-        if (typeof fontWeight === 'number') {
-            return fontWeight;
-        }
-
-        switch (fontWeight.toLowerCase()) {
-            case 'thin': return 100;
-            case 'extralight':
-            case 'extra-light': return 200;
-            case 'light': return 300;
-            case 'normal': return 400;
-            case 'medium': return 500;
-            case 'semibold':
-            case 'semi-bold': return 600;
-            case 'bold': return 700;
-            case 'extrabold':
-            case 'extra-bold': return 800;
-            case 'black': return 900;
-            case 'extrablack':
-            case 'extra-black': return 1000;
-            default: return 400;
-        }
-    }
-
-    /**
-     * Map CSS font-style values to Skia FontSlant
-     */
-    private mapCSSFontStyleToSkia(fontStyle: string): any {
-        switch (fontStyle.toLowerCase()) {
-            case 'italic': return 1;
-            case 'oblique': return 2;
-            case 'normal':
-            default: return 0;
-        }
-    }
-
-    /**
-     * Create a Skia Font from CSS styles using the TypefaceFontProvider
-     */
-    private createSkiaFont(styles: CSSParsedDeclaration): SkiaFont {
-        const fontInfo = this.parseFontStyle(styles);
-        const font = new this.canvasKit.Font();
-
-        // Set font size
-        font.setSize(fontInfo.fontSize);
-
-        // Try to get a typeface for each font family until one is found
-        let typeface: Typeface | null = null;
-        const fallbackFontFamilyClasses = (['sans-serif', 'serif', 'monospace', 'cursive', 'fantasy', 'fangsong'] as FontFamilyClass[])
-            .filter(family => fontInfo.fontFamily.includes(family));
-        const fallbackFontFamilies = this.options.fontCollection.getFallbackFontFamilies(fallbackFontFamilyClasses);
-        for (const family of [...fontInfo.fontFamily, ...fallbackFontFamilies]) {
-            try {
-                typeface = this.fontProvider.matchFamilyStyle(family, fontInfo.fontStyle as any);
-                if (typeface) {
-                    break;
-                }
-            } catch {
-                // Continue to next font family
-                continue;
-            }
-        }
-
-        // Set the typeface if found
-        if (typeface) {
-            font.setTypeface(typeface);
-        }
-
-        // Set font properties
-        if (font.setSubpixel) {
-            font.setSubpixel(true);
-        }
-
-        return font;
-    }
-
     renderTextNode(text: TextContainer, styles: CSSParsedDeclaration): void {
-        const font = this.createSkiaFont(styles);
+        const font = createSkiaFont(styles, this.options.fontCollection);
         const { baseline, middle } = this.fontMetrics.getMetrics(styles.fontFamily.join(', '), styles.fontSize.number.toString());
         const paintOrder = styles.paintOrder;
 
@@ -475,8 +342,6 @@ export class SkiaRenderer {
                 }
             });
         });
-
-        font.delete();
     }
 
     renderReplacedElement(
@@ -665,7 +530,7 @@ export class SkiaRenderer {
         }
 
         if (isTextInputElement(container) && container.value.length) {
-            const font = this.createSkiaFont(styles);
+            const font = createSkiaFont(styles, this.options.fontCollection);
             const { baseline } = this.fontMetrics.getMetrics(styles.fontFamily.join(', '), styles.fontSize.number.toString());
 
             const paint = this.createPaint('fill');
@@ -698,7 +563,6 @@ export class SkiaRenderer {
 
             this.canvas.restore();
             paint.delete();
-            font.delete();
         }
 
         if (contains(container.styles.display, 2048 /* DISPLAY.LIST_ITEM */)) {
@@ -739,7 +603,7 @@ export class SkiaRenderer {
                     }
                 }
             } else if (paint.listValue && container.styles.listStyleType !== -1 /* LIST_STYLE_TYPE.NONE */) {
-                const font = this.createSkiaFont(styles);
+                const font = createSkiaFont(styles, this.options.fontCollection);
                 const listPaint = this.createPaint('fill');
                 listPaint.setColor(this.parseColorWithAlpha(styles.color));
                 const textBounds = container.textNodes[0]?.textBounds[0]?.bounds
@@ -760,7 +624,6 @@ export class SkiaRenderer {
                 );
 
                 listPaint.delete();
-                font.delete();
             }
         }
         if (container.pdfTagNodeId) {
@@ -1347,11 +1210,6 @@ export class SkiaRenderer {
         ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, width, height);
         return canvas;
     }
-    private areGlyphsMissing(font: SkiaFont, text: string): boolean {
-        // Check if the font has glyphs for the text
-        const glyphs = font.getGlyphIDs(text);
-        return glyphs.length === 0 || glyphs.some((glyph) => glyph === 0);
-    }
 }
 
 const isTextInputElement = (
@@ -1379,11 +1237,4 @@ const calculateBackgroundCurvedPaintingArea = (clip: BACKGROUND_CLIP, curves: Bo
     }
 };
 
-// see https://github.com/niklasvh/html2canvas/pull/2645
-const iOSBrokenFonts = ['-apple-system', 'system-ui'];
 
-const fixIOSSystemFonts = (fontFamilies: string[]): string[] => {
-    return /iPhone OS 15_(0|1)/.test(window.navigator.userAgent)
-        ? fontFamilies.filter((fontFamily) => iOSBrokenFonts.indexOf(fontFamily) === -1)
-        : fontFamilies;
-};

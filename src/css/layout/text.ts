@@ -5,14 +5,18 @@ import { splitGraphemes } from "text-segmentation";
 import { Bounds, parseBounds } from "./bounds";
 import { FEATURES } from "../../core/features";
 import { Context } from "../../core/context";
+import { Font } from "@rollerbird/canvaskit-wasm-pdf";
+import { createSkiaFont, getFinalFont } from "../../render/skia/skia-font";
 
 export class TextBounds {
   readonly text: string;
   readonly bounds: Bounds;
+  readonly font?: Font;
 
-  constructor(text: string, bounds: Bounds) {
+  constructor(text: string, bounds: Bounds, font?: Font) {
     this.text = text;
     this.bounds = bounds;
+    this.font = font;
   }
 }
 
@@ -20,20 +24,33 @@ export const parseTextBounds = (
   context: Context,
   value: string,
   styles: CSSParsedDeclaration,
-  node: Text
+  node: Text,
 ): TextBounds[] => {
+  const fontCollection = context.fontCollection;
   const textList = breakText(value, styles);
-  const textBounds: TextBounds[] = [];
+  let textBounds: TextBounds[] = [];
   let offset = 0;
+  let font: Font | undefined;
+  if (fontCollection) {
+    font = createSkiaFont(styles, fontCollection);
+  }
   textList.forEach((text) => {
-    if (styles.textDecorationLine.length || text.trim().length > 0) {
+    if( text === "\n") {
+      // ignore newlines
+    }
+    else if (styles.textDecorationLine.length || text.trim().length > 0 && text !== "\n") {
       if (FEATURES.SUPPORT_RANGE_BOUNDS) {
         const clientRects = createRange(
           node,
           offset,
           text.length
         ).getClientRects();
-        if (clientRects.length > 1) {
+        let glyphMissing = false;
+        if(clientRects.length > 0) {
+          const glyphIDs = font?.getGlyphIDs(text);
+          glyphMissing = glyphIDs?.some((id) => id === 0) ?? false;
+        }
+        if (clientRects.length > 1 || glyphMissing) {
           const subSegments = segmentGraphemes(text);
           let subOffset = 0;
           subSegments.forEach((subSegment) => {
@@ -47,19 +64,20 @@ export const parseTextBounds = (
                     subOffset + offset,
                     subSegment.length
                   ).getClientRects()
-                )
+                ),
+                font && fontCollection? getFinalFont(subSegment, styles, font, fontCollection) : undefined
               )
             );
             subOffset += subSegment.length;
-          });
+          });          
         } else {
           textBounds.push(
-            new TextBounds(text, Bounds.fromDOMRectList(context, clientRects))
+            new TextBounds(text, Bounds.fromDOMRectList(context, clientRects), font)
           );
         }
       } else {
         const replacementNode = node.splitText(text.length);
-        textBounds.push(new TextBounds(text, getWrapperBounds(context, node)));
+        textBounds.push(new TextBounds(text, getWrapperBounds(context, node), font));
         node = replacementNode;
       }
     } else if (!FEATURES.SUPPORT_RANGE_BOUNDS) {
@@ -67,9 +85,12 @@ export const parseTextBounds = (
     }
     offset += text.length;
   });
-
+  textBounds = textBounds.filter((tb => tb.bounds.width > 0 || tb.bounds.height > 0));
+  if( styles.letterSpacing === 0 && fontCollection && textBounds.length > 0) {
+    textBounds = combineLines(textBounds);
+  }
   // Filter out empty bounds
-  return textBounds.filter((tb => tb.bounds.width > 0 || tb.bounds.height > 0));
+  return textBounds;
 };
 
 const getWrapperBounds = (context: Context, node: Text): Bounds => {
@@ -182,4 +203,42 @@ const breakWords = (str: string, styles: CSSParsedDeclaration): string[] => {
   }
 
   return words;
+};
+
+const combineLines = (textBounds: TextBounds[]): TextBounds[] => {
+  const combined: TextBounds[] = [];
+  let currentText = "";
+  let currentBounds = Bounds.EMPTY;
+  let currentFont: Font | undefined;
+
+  textBounds.forEach((tb) => {
+    if (currentText.length === 0) {
+      currentText = tb.text;
+      currentBounds = tb.bounds;
+      currentFont = tb.font;
+    } else if (currentBounds.top + currentBounds.height > tb.bounds.top && currentFont === tb.font) {
+      currentText += tb.text;
+      currentBounds = unionBounds(currentBounds, tb.bounds);
+    } else {
+      combined.push(new TextBounds(currentText, currentBounds, currentFont));
+      currentText = tb.text;
+      currentBounds = tb.bounds;
+      currentFont = tb.font;
+    }
+  });
+
+  if (currentText.length > 0) {
+    combined.push(new TextBounds(currentText, currentBounds, currentFont));
+  }
+
+  return combined;
+};
+
+const unionBounds = (bounds1: Bounds, bounds2: Bounds): Bounds => {
+  return new Bounds(
+    Math.min(bounds1.left, bounds2.left),
+    Math.min(bounds1.top, bounds2.top),
+    Math.max(bounds1.left + bounds1.width, bounds2.left + bounds2.width) - Math.min(bounds1.left, bounds2.left),
+    Math.max(bounds1.top + bounds1.height, bounds2.top + bounds2.height) - Math.min(bounds1.top, bounds2.top)
+  );
 };

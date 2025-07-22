@@ -15,7 +15,7 @@ import emojiRegex from "emoji-regex-xs";
 
 const fontNamesToFilter = new Set([ 'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy' ]);
 export function enumerateFonts(elements: HTMLElement[]): IFontProperties[]{
-    const fonts = new Set<IFontProperties>();
+    const fonts = new Map<string, IFontProperties>();
     const ctx = new Context({logging:true, imageTimeout:5000, useCORS:true, allowTaint:true}, Bounds.EMPTY);
     const collectFonts = (el: Element): void => {
         const computedStyle = window.getComputedStyle(el);
@@ -24,8 +24,8 @@ export function enumerateFonts(elements: HTMLElement[]): IFontProperties[]{
             fontWeight: parseFontWeight(ctx, computedStyle.fontWeight),
             fontSlant: parseFontSlant(ctx, computedStyle.fontStyle),
         }
-
-        fonts.add(fontProperty);
+        const fontKey = fontProperty.families.join(",") + "/" + fontProperty.fontWeight + "," + fontProperty.fontSlant;
+        fonts.set(fontKey, fontProperty);
 
         // Recursively check all child elements
         for (const child of Array.from(el.children)) {
@@ -34,7 +34,7 @@ export function enumerateFonts(elements: HTMLElement[]): IFontProperties[]{
     }
 
     elements.forEach( element => collectFonts(element));
-    return Array.from(fonts);
+    return Array.from(fonts.values());
 }
 
 
