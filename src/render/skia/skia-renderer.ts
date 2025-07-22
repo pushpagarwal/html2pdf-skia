@@ -228,12 +228,7 @@ export class SkiaRenderer {
     }
 
     renderTextWithLetterSpacing(text: TextBounds, letterSpacing: number, baseline: number, paint: SkiaPaint, font: SkiaFont): void {
-        if (letterSpacing === 0) {
-            let finalFont = text.font ?? font;
-            const glyphIDs = finalFont.getGlyphIDs(text.text);
-            const widths = finalFont.getGlyphWidths(glyphIDs, paint);
-            const totalWidth = widths.reduce((a, b) => a + b, 0);
-            console.log(`Drawing text: "${text.text}" in width  ${text.bounds.width} with glyphwidth ${totalWidth}`);
+        if (letterSpacing === 0 || text.text.length === 1) {
             this.canvas.drawText(text.text, text.bounds.left, text.bounds.top + baseline, paint, text.font ?? font);
         } else {
             const letters = segmentGraphemes(text.text);

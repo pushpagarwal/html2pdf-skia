@@ -103,7 +103,7 @@ export class SkiaFontCollection implements IFontCollection {
         await delay(0); // Yield to allow font loading to complete
     }
     getFont(typeface: Typeface, fontSize: number): Font {
-        const cacheKey = `${(typeface as any).cb.lb}-${fontSize}`;
+        const cacheKey = `${getTypefaceKey(typeface)}-${fontSize}`;
         if (this.fontsCache.has(cacheKey)) {
             return this.fontsCache.get(cacheKey)!;
         }
@@ -131,4 +131,8 @@ export class SkiaFontCollection implements IFontCollection {
 
 export function createFontCollection(canvasKit: CanvasKit): IFontCollection {
     return new SkiaFontCollection(canvasKit);
+}
+
+function getTypefaceKey(typeface: Typeface): string {
+    return `${typeface.getFamilyName()}-${typeface.getFontStyle().weight}-${typeface.getFontStyle().slant}`;
 }
