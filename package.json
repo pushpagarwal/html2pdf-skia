@@ -1,6 +1,6 @@
 {
   "name": "html2pdf-skia",
-  "description": "Screenshots with JavaScript. Next generation!",
+  "description": "HTML to PDF renderer using Skia and CanvasKit",
   "main": "lib/html2pdf-skia.cjs.js",
   "module": "lib/html2pdf-skia.esm.js",
   "typings": "lib/types/index.d.ts",
