@@ -138,7 +138,7 @@ const createsRealStackingContext = (
 };
 
 const createsStackingContext = (styles: CSSParsedDeclaration): boolean =>
-  styles.isPositioned() || styles.isFloating();
+  styles.isPositioned() || styles.isFloating() || styles.isInlineLevel();
 
 export const isTextNode = (node: Node): node is Text =>
   node.nodeType === Node.TEXT_NODE;
