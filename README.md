@@ -4,6 +4,29 @@
 
 html2pdf-skia generates high-quality PDFs directly from HTML/CSS content using Google's Skia graphics engine. Unlike other libraries that embed rasterized images into PDFs, html2pdf-skia produces true vector graphics with selectable text, making the output both lightweight and accessible.
 
+## Why html2pdf-skia
+
+The existing html2pdf library, while popular, **failed to meet our requirements** for accessible PDF generation. Its fundamental approach of embedding rasterized images into PDF pages creates several critical limitations:
+
+**❌ What html2pdf couldn't deliver:**
+- **Inaccessible PDFs** - Text becomes unselectable images, failing screen reader compatibility
+- **Poor searchability** - Content cannot be indexed, searched, or extracted
+- **Large file sizes** - Rasterized images dramatically increase PDF size
+- **Low print quality** - Pixelated output when printed at high resolutions
+- **No accessibility compliance** - Fails to meet WCAG and Section 508 standards
+
+**✅ Why we built html2pdf-skia as the solution:**
+
+Since html2pdf couldn't meet our accessibility and quality requirements, we created html2pdf-skia as a complete reimagining of HTML-to-PDF conversion. Our improved version leverages Google's Skia graphics engine to deliver:
+
+- **True vector PDFs** - Text and graphics remain live, selectable, and searchable
+- **Full accessibility compliance** - Tagged PDFs work seamlessly with screen readers
+- **Superior quality** - Vector graphics scale perfectly at any resolution
+- **Smaller file sizes** - Efficient vector encoding vs. embedded images
+- **Professional output** - Publication-ready PDFs that meet enterprise standards
+
+html2pdf-skia isn't just an alternative—it's the next-generation solution that addresses every limitation of the original html2pdf library.
+
 ## ✨ Key Features
 
 - **🎯 Vector Graphics**: True vector PDF output with crisp text and graphics at any zoom level
