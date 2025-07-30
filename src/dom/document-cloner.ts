@@ -157,9 +157,13 @@ export class DocumentCloner {
      * */
     const baseUri = documentClone.baseURI;
     documentClone.open();
-    documentClone.write(`${serializeDoctype(document.doctype)}<html></html>`);
+    if (document.doctype && document.doctype.nodeType === Node.DOCUMENT_TYPE_NODE) {
+            const doctypeClone = document.doctype.cloneNode(false);
+            documentClone.append(doctypeClone);
+    }
     // Chrome scrolls the parent document for some reason after the write to the cloned window???
     restoreOwnerScroll(this.referenceElement.ownerDocument, scrollX, scrollY);
+  
     /**
      * Note: adoptNode() should be called AFTER documentClone.open() and close()
      *
@@ -172,7 +176,7 @@ export class DocumentCloner {
      * */
     const adoptedNode = documentClone.adoptNode(this.documentElement);
     addBase(adoptedNode, baseUri);
-    documentClone.replaceChild(adoptedNode, documentClone.documentElement);
+    documentClone.appendChild(adoptedNode);
     documentClone.close();
 
     return iframeLoad;
@@ -700,32 +704,6 @@ export const copyCSSStyles = <T extends HTMLElement | SVGElement>(
     }
   }
   return target;
-};
-
-const serializeDoctype = (doctype?: DocumentType | null): string => {
-  let str = "";
-  if (doctype) {
-    str += "<!DOCTYPE ";
-    if (doctype.name) {
-      str += doctype.name;
-    }
-
-    if (doctype.internalSubset) {
-      str += doctype.internalSubset;
-    }
-
-    if (doctype.publicId) {
-      str += `"${doctype.publicId}"`;
-    }
-
-    if (doctype.systemId) {
-      str += `"${doctype.systemId}"`;
-    }
-
-    str += ">";
-  }
-
-  return str;
 };
 
 const restoreOwnerScroll = (
