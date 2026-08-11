@@ -28,6 +28,7 @@ export class FontMetrics {
     container.style.margin = "0";
     container.style.padding = "0";
     container.style.whiteSpace = "nowrap";
+    container.style.lineHeight = "normal";
 
     body.appendChild(container);
 
@@ -52,7 +53,6 @@ export class FontMetrics {
     container.removeChild(span);
     container.appendChild(this._document.createTextNode(SAMPLE_TEXT));
 
-    container.style.lineHeight = "normal";
     img.style.verticalAlign = "super";
 
     const middle = img.offsetTop - container.offsetTop + 2;
