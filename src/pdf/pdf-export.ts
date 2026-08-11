@@ -5,7 +5,7 @@ import { SkiaRenderer } from "../render/skia/skia-renderer";
 import { IFontCollection } from "../fonts/interfaces";
 import { SkiaFontCollection } from "../fonts/font-collection";
 
-export const defaultUserToPdfScale = 0.5; // Default scale for PDF rendering
+export const defaultUserToPdfScale = 0.75; // Default scale for PDF rendering
 export interface IPageSize {
     width: number;
     height: number;

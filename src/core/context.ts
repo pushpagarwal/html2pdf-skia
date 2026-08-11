@@ -6,12 +6,14 @@ import { SkiaFontCollection } from "../fonts/font-collection";
 export type ContextOptions = {
   logging: boolean;
   cache?: Cache;
+  experimentalSVGDrawing?: boolean;
 } & ResourceOptions;
 
 export class Context {
   private readonly instanceName = `#${Context.instanceCount++}`;
   readonly logger: Logger;
   readonly cache: Cache;
+  readonly experimentalSVGDrawing: boolean;
 
   private static instanceCount = 1;
 
@@ -21,5 +23,6 @@ export class Context {
       enabled: options.logging,
     });
     this.cache = options.cache ?? new Cache(this, options);
+    this.experimentalSVGDrawing = options.experimentalSVGDrawing ?? false;
   }
 }
