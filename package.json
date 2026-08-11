@@ -5,7 +5,7 @@
   "module": "lib/html2pdf-skia.esm.js",
   "typings": "lib/types/index.d.ts",
   "browser": "lib/html2pdf-skia.js",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "author": {
     "name": "pushpagarwal",
     "email": "pushp.agarwal@gmail.com",
