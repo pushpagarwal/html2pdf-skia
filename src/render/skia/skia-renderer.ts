@@ -51,7 +51,6 @@ import { Context } from '../../core/context';
 import { SkiaFontCollection } from '../../fonts/font-collection';
 import { createSkiaFont } from './skia-font';
 import { renderExperimentalSVG } from './experimental-svg-renderer';
-import { isDimensionToken } from '../../css/syntax/parser';
 
 export interface CanvasKitConfig {
     canvasKit: CanvasKit;
@@ -93,13 +92,11 @@ export class SkiaRenderer {
     canvas: SkiaCanvas;
     canvasKit: CanvasKit;
     private readonly _activeEffects: IElementEffect[] = [];
-    private readonly fontMetrics: FontMetrics;
     private readonly globalAlpha: GlobalAlpha = new GlobalAlpha();
 
     constructor(private context: Context, ckConfig: CanvasKitConfig, private options: SkiaRenderOptions) {
         this.canvas = ckConfig.canvas;
         this.canvasKit = ckConfig.canvasKit;
-        this.fontMetrics = new FontMetrics(document);
         this.canvas.scale(options.scale, options.scale);
         this.canvas.translate(-options.x, -options.y);
         this._activeEffects = [];
@@ -252,10 +249,7 @@ export class SkiaRenderer {
 
     renderTextNode(text: TextContainer, styles: CSSParsedDeclaration): void {
         const font = createSkiaFont(styles, this.options.fontCollection);
-        const fontSize = isDimensionToken(styles.fontSize)
-            ? `${styles.fontSize.number}${styles.fontSize.unit}`
-            : `${styles.fontSize.number}px`;
-        const { baseline, middle } = this.fontMetrics.getMetrics(styles.fontFamily.join(', '), fontSize);
+        const { baseline, middle } = FontMetrics.getMetricsFromSkFont(font);
         const paintOrder = styles.paintOrder;
 
         text.textBounds.forEach((textBounds) => {
@@ -527,7 +521,7 @@ export class SkiaRenderer {
 
         if (isTextInputElement(container) && container.value.length) {
             const font = createSkiaFont(styles, this.options.fontCollection);
-            const { baseline } = this.fontMetrics.getMetrics(styles.fontFamily.join(', '), styles.fontSize.number.toString());
+            const { baseline } = FontMetrics.getMetricsFromSkFont(font);
 
             const paint = this.createPaint('fill');
             paint.setColor(this.parseColorWithAlpha(styles.color));
