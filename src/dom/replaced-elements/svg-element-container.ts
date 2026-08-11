@@ -6,9 +6,11 @@ export class SVGElementContainer extends ElementContainer {
   svg: string;
   intrinsicWidth: number;
   intrinsicHeight: number;
+  svgNode?: SVGSVGElement;
 
   constructor(context: Context, img: SVGSVGElement) {
     super(context, img);
+    this.svgNode = img;
     const s = new XMLSerializer();
     const bounds = parseBounds(context, img);
     img.setAttribute("width", `${bounds.width}px`);

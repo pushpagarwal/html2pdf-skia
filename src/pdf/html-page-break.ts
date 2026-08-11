@@ -1,6 +1,7 @@
+import { isScriptElement, isStyleElement } from "../dom/node-parser";
 import { clearHideNextPageItems, HIDE_NEXT_PAGE_ITEM_CLASS, HIDE_PREVIOUS_PAGE_ITEM_CLASS } from "./dom-updates";
 
-const marginBottom = 36; // Default margin bottom for each page
+const marginBottom = 0; // Default margin bottom for each page
 
 export class HtmlPageBreak {
     private document: Document;
@@ -13,7 +14,7 @@ export class HtmlPageBreak {
     }
 
     public processPage(): HTMLElement | null {
-        let finalPageHeight = this.pageHeight - marginBottom; // Adjust page height for margin
+        let finalPageHeight = Math.ceil(this.pageHeight - marginBottom); // Adjust page height for margin
         this.pageItems = []; // Reset page items
 
         const getUnionOfBounds = (bounds1?: DOMRect, bounds2?: DOMRect): DOMRect | undefined => {
@@ -56,6 +57,10 @@ export class HtmlPageBreak {
                 return NO_PAGE_ITEMS;
             }
 
+            if(isStyleElement(element) || isScriptElement(element)) {
+                return NO_PAGE_ITEMS; // Skip style and script elements
+            }
+            
             const bounds = element.getBoundingClientRect();
             const elementTop = bounds.top;
             const elementBottom = bounds.bottom;

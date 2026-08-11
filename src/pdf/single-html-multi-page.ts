@@ -10,6 +10,7 @@ import { Context, ContextOptions } from "../core/context";
 import { Bounds } from "../css/layout/bounds";
 import { appendPageStyles } from "./dom-updates";
 import { SkiaFontCollection } from "../fonts/font-collection";
+import { isSVGElement } from "../dom/node-parser";
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -52,6 +53,7 @@ function getContextOptions(
     return {
         logging: options.logging ?? false,
         cache: options.cache,
+        experimentalSVGDrawing: options.experimentalSVGDrawing ?? false,
         imageTimeout: options.imageTimeout ?? 15000,
         useCORS: options.useCORS ?? true,
         allowTaint: options.allowTaint ?? false,
@@ -89,9 +91,11 @@ export async function exportHTMLDocumentToPdf(
    };
    const container = await documentCloner.toIFrame(document, new Bounds(0, 0, devicePageSize.width, devicePageSize.height));
    appendPageStyles(clonedElement.ownerDocument);
+   
    const iframeDocument = clonedElement.ownerDocument;
    iframeDocument.title = document.title || "Document";
    await (options.fontCollection as SkiaFontCollection)?.addFontsToDocument(iframeDocument);
+   wrapMixedTextNodes(iframeDocument.body);
    const pdfInputProvider = new SingleHtmlMultiPageProvider(iframeDocument, devicePageSize);
    const blob = await exportToPdf(
        canvasKit,
@@ -105,4 +109,45 @@ export async function exportHTMLDocumentToPdf(
       );
     }   
    return blob;
+}
+
+
+function wrapMixedTextNodes(root: Element) {
+  const document = root.ownerDocument;
+  function processElement(el: Element) {
+    if(isSVGElement(el)) {
+      return; // Skip SVG elements
+    }
+    let hasText = false;
+    let hasElement = false;
+
+    // Check children to see if mix exists
+    const childNodes = Array.from(el.childNodes);
+    for (const node of childNodes) {
+      if (node.nodeType === Node.TEXT_NODE && (node.nodeValue ?? '').trim() !== '') {
+        hasText = true;
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        hasElement = true;
+      }
+    }
+
+    // If both text and element children exist → wrap text nodes
+    if (hasText && hasElement) {
+      for (const node of childNodes) {
+        if (node.nodeType === Node.TEXT_NODE && (node.nodeValue ?? '').trim() !== '') {
+          const span = document.createElement('span');
+          span.textContent = node.nodeValue;
+          el.replaceChild(span, node);
+        }
+      }
+    }
+
+    // Recurse into children
+    const children = Array.from(el.children);
+    for (const node of children) {
+      processElement(node);
+    }
+  }
+
+  processElement(root);
 }

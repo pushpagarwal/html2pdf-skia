@@ -50,6 +50,8 @@ import { TextShadow } from '../../css/property-descriptors/text-shadow';
 import { Context } from '../../core/context';
 import { SkiaFontCollection } from '../../fonts/font-collection';
 import { createSkiaFont } from './skia-font';
+import { renderExperimentalSVG } from './experimental-svg-renderer';
+import { isDimensionToken } from '../../css/syntax/parser';
 
 export interface CanvasKitConfig {
     canvasKit: CanvasKit;
@@ -104,6 +106,10 @@ export class SkiaRenderer {
         this.context.logger.debug(
             `Skia renderer initialized (${options.width}x${options.height}) with scale ${options.scale}`
         );
+    }
+
+    get renderOptions(): SkiaRenderOptions {
+        return this.options;
     }
 
     private parseColor(color: Color): Float32Array {
@@ -246,7 +252,10 @@ export class SkiaRenderer {
 
     renderTextNode(text: TextContainer, styles: CSSParsedDeclaration): void {
         const font = createSkiaFont(styles, this.options.fontCollection);
-        const { baseline, middle } = this.fontMetrics.getMetrics(styles.fontFamily.join(', '), styles.fontSize.number.toString());
+        const fontSize = isDimensionToken(styles.fontSize)
+            ? `${styles.fontSize.number}${styles.fontSize.unit}`
+            : `${styles.fontSize.number}px`;
+        const { baseline, middle } = this.fontMetrics.getMetrics(styles.fontFamily.join(', '), fontSize);
         const paintOrder = styles.paintOrder;
 
         text.textBounds.forEach((textBounds) => {
@@ -279,11 +288,13 @@ export class SkiaRenderer {
                                     const blurEffect = this.canvasKit.MaskFilter.MakeBlur(this.canvasKit.BlurStyle.Normal,
                                         textShadow.blur.number / 2,
                                         false);
-                                    shadowPaint.setMaskFilter(blurEffect);
+                                    if(blurEffect) {
+                                        shadowPaint.setMaskFilter(blurEffect);
+                                    }
                                     this.renderTextWithLetterSpacing(textBounds, styles.letterSpacing, baseline, shadowPaint, font);
                                     this.canvas.restore();
                                     shadowPaint.delete();
-                                    blurEffect.delete();
+                                    blurEffect?.delete();
                                 });
                         }
 
@@ -413,22 +424,12 @@ export class SkiaRenderer {
 
         if (container instanceof SVGElementContainer) {
             try {
-                const cachedSvg = await this.context.cache.match(container.svg);
-                // For SVG, we need to get the actual SVG element
-                if (cachedSvg && cachedSvg instanceof SVGElement) {
-                    const skiaImage = await this.convertSvgToSkia(cachedSvg);
-                    if (skiaImage) {
-                        const curves = new BoundCurves(container);
-                        this.renderReplacedElement(container, curves, skiaImage);
-                        skiaImage.delete();
-                    }
+                if (this.context.experimentalSVGDrawing) {
+                    await renderExperimentalSVG(this, container);
                 } else {
-                    // Fallback: try to create SVG element from string
-                    const parser = new DOMParser();
-                    const svgDoc = parser.parseFromString(container.svg, 'image/svg+xml');
-                    const svgElement = svgDoc.documentElement;
-                    if (svgElement instanceof SVGElement) {
-                        const skiaImage = await this.convertSvgToSkia(svgElement);
+                    const cachedSvg = await this.context.cache.match(container.svg);
+                    if (cachedSvg && cachedSvg instanceof Image) {
+                        const skiaImage = this.convertCanvasImageSourceToSkia(cachedSvg);
                         if (skiaImage) {
                             const curves = new BoundCurves(container);
                             this.renderReplacedElement(container, curves, skiaImage);
@@ -956,7 +957,9 @@ export class SkiaRenderer {
                     const blurEffect = this.canvasKit.MaskFilter.MakeBlur(this.canvasKit.BlurStyle.Normal,
                         shadow.blur.number / 2,
                         false);
-                    shadowPaint.setMaskFilter(blurEffect);
+                    if(blurEffect) {    
+                        shadowPaint.setMaskFilter(blurEffect);
+                    }
                     this.canvas.save();
                     this.canvas.translate(
                         shadow.offsetX.number + maskOffset,
@@ -969,7 +972,7 @@ export class SkiaRenderer {
 
                     shadowPaint.delete();
                     shadowPath.delete();
-                    blurEffect.delete();
+                    blurEffect?.delete();
                     this.canvas.restore();
                 });
         }
@@ -1109,66 +1112,6 @@ export class SkiaRenderer {
         } catch (error) {
             const srcType = src.constructor.name;
             this.context.logger.error(`Failed to convert ${srcType} to SkiaImage: ${error}`);
-            return null;
-        }
-    }
-
-    private async convertSvgToSkia(svgElement: SVGElement): Promise<SkiaImage | null> {
-        try {
-            // SVGElement is not directly supported by MakeImageFromCanvasImageSource,
-            // so we continue using the buffer-based approach for SVG conversion
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            if (!tempCtx) {
-                this.context.logger.error('Failed to get 2D context for SVG conversion');
-                return null;
-            }
-
-            // Get SVG dimensions
-            const svgRect = svgElement.getBoundingClientRect();
-            tempCanvas.width = svgRect.width || 100;
-            tempCanvas.height = svgRect.height || 100;
-
-            // Convert SVG to data URL
-            const svgData = new XMLSerializer().serializeToString(svgElement);
-            const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-            const url = URL.createObjectURL(svgBlob);
-
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.onload = async () => {
-                    // Draw SVG image to canvas
-                    tempCtx.drawImage(img, 0, 0);
-
-                    // Get image data and convert to SkiaImage
-                    const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-
-                    const skiaImage = this.canvasKit.MakeImageFromEncoded(imageData.data);
-                    if (!skiaImage) {
-                        // Fallback: try creating from raw pixel data
-                        const info = {
-                            width: tempCanvas.width,
-                            height: tempCanvas.height,
-                            alphaType: this.canvasKit.AlphaType.Unpremul,
-                            colorType: this.canvasKit.ColorType.RGBA_8888,
-                            colorSpace: this.canvasKit.ColorSpace.SRGB
-                        };
-                        resolve(this.canvasKit.MakeImage(info, imageData.data, tempCanvas.width * 4));
-                    } else {
-                        resolve(skiaImage);
-                    }
-
-                    URL.revokeObjectURL(url);
-                };
-                img.onerror = () => {
-                    this.context.logger.error('Failed to load SVG as image');
-                    URL.revokeObjectURL(url);
-                    resolve(null);
-                };
-                img.src = url;
-            });
-        } catch (error) {
-            this.context.logger.error(`Failed to convert SVG to SkiaImage: ${error}`);
             return null;
         }
     }
