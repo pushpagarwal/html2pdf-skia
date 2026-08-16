@@ -24,7 +24,7 @@ export const parseTextBounds = (
   context: Context,
   value: string,
   styles: CSSParsedDeclaration,
-  node: Text,
+  node: Text
 ): TextBounds[] => {
   const fontCollection = context.fontCollection;
   const textList = breakText(value, styles);
@@ -35,10 +35,12 @@ export const parseTextBounds = (
     font = createSkiaFont(styles, fontCollection);
   }
   textList.forEach((text) => {
-    if( text === "\n") {
+    if (text === "\n") {
       // ignore newlines
-    }
-    else if (styles.textDecorationLine.length || text.trim().length > 0 && text !== "\n") {
+    } else if (
+      styles.textDecorationLine.length ||
+      (text.trim().length > 0 && text !== "\n")
+    ) {
       if (FEATURES.SUPPORT_RANGE_BOUNDS) {
         const clientRects = createRange(
           node,
@@ -46,7 +48,7 @@ export const parseTextBounds = (
           text.length
         ).getClientRects();
         let glyphMissing = false;
-        if(clientRects.length > 0) {
+        if (clientRects.length > 0) {
           const glyphIDs = font?.getGlyphIDs(text);
           glyphMissing = glyphIDs?.some((id) => id === 0) ?? false;
         }
@@ -65,19 +67,27 @@ export const parseTextBounds = (
                     subSegment.length
                   ).getClientRects()
                 ),
-                font && fontCollection? getFinalFont(subSegment, styles, font, fontCollection) : undefined
+                font && fontCollection
+                  ? getFinalFont(subSegment, styles, font, fontCollection)
+                  : undefined
               )
             );
             subOffset += subSegment.length;
-          });          
+          });
         } else {
           textBounds.push(
-            new TextBounds(text, Bounds.fromDOMRectList(context, clientRects), font)
+            new TextBounds(
+              text,
+              Bounds.fromDOMRectList(context, clientRects),
+              font
+            )
           );
         }
       } else {
         const replacementNode = node.splitText(text.length);
-        textBounds.push(new TextBounds(text, getWrapperBounds(context, node), font));
+        textBounds.push(
+          new TextBounds(text, getWrapperBounds(context, node), font)
+        );
         node = replacementNode;
       }
     } else if (!FEATURES.SUPPORT_RANGE_BOUNDS) {
@@ -85,8 +95,10 @@ export const parseTextBounds = (
     }
     offset += text.length;
   });
-  textBounds = textBounds.filter((tb => tb.bounds.width > 0 || tb.bounds.height > 0));
-  if( styles.letterSpacing === 0 && fontCollection && textBounds.length > 0) {
+  textBounds = textBounds.filter(
+    (tb) => tb.bounds.width > 0 || tb.bounds.height > 0
+  );
+  if (styles.letterSpacing === 0 && fontCollection && textBounds.length > 0) {
     textBounds = combineLines(textBounds);
   }
   // Filter out empty bounds
@@ -216,7 +228,10 @@ const combineLines = (textBounds: TextBounds[]): TextBounds[] => {
       currentText = tb.text;
       currentBounds = tb.bounds;
       currentFont = tb.font;
-    } else if (currentBounds.top + currentBounds.height > tb.bounds.top && currentFont === tb.font) {
+    } else if (
+      currentBounds.top + currentBounds.height > tb.bounds.top &&
+      currentFont === tb.font
+    ) {
       currentText += tb.text;
       currentBounds = unionBounds(currentBounds, tb.bounds);
     } else {
@@ -238,7 +253,9 @@ const unionBounds = (bounds1: Bounds, bounds2: Bounds): Bounds => {
   return new Bounds(
     Math.min(bounds1.left, bounds2.left),
     Math.min(bounds1.top, bounds2.top),
-    Math.max(bounds1.left + bounds1.width, bounds2.left + bounds2.width) - Math.min(bounds1.left, bounds2.left),
-    Math.max(bounds1.top + bounds1.height, bounds2.top + bounds2.height) - Math.min(bounds1.top, bounds2.top)
+    Math.max(bounds1.left + bounds1.width, bounds2.left + bounds2.width) -
+      Math.min(bounds1.left, bounds2.left),
+    Math.max(bounds1.top + bounds1.height, bounds2.top + bounds2.height) -
+      Math.min(bounds1.top, bounds2.top)
   );
 };

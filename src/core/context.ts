@@ -17,7 +17,11 @@ export class Context {
 
   private static instanceCount = 1;
 
-  constructor(options: ContextOptions, public windowBounds: Bounds, public readonly fontCollection?: SkiaFontCollection) {
+  constructor(
+    options: ContextOptions,
+    public windowBounds: Bounds,
+    public readonly fontCollection?: SkiaFontCollection
+  ) {
     this.logger = new Logger({
       id: this.instanceName,
       enabled: options.logging,

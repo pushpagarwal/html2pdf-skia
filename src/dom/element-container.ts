@@ -21,7 +21,6 @@ export class ElementContainer {
   flags = 0;
   readonly pdfTagNodeId?: number;
 
-
   constructor(protected readonly context: Context, element: Element) {
     if (isDebugging(element, DebuggerType.PARSE)) {
       debugger;
