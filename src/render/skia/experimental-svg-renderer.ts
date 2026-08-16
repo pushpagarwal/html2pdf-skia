@@ -2,6 +2,7 @@ import { CanvasKit, Paint, Font } from "@rollerbird/canvaskit-wasm-pdf";
 import { SkiaRenderer } from "./skia-renderer";
 import { SVGElementContainer } from "../../dom/replaced-elements/svg-element-container";
 import { SkiaFontCollection } from "../../fonts/font-collection";
+import { mapCSSFontWeightToSkia, mapCSSFontStyleToSkia } from "./skia-font";
 
 export interface SVGStyleContext {
   fill: string;
@@ -12,6 +13,7 @@ export interface SVGStyleContext {
   fontSize: number;
   fontWeight: string;
   fontFamily: string;
+  letterSpacing: number;
   textAnchor: string;
   dominantBaseline: string;
 }
@@ -25,6 +27,7 @@ const DEFAULT_STYLE_CONTEXT: SVGStyleContext = {
   fontSize: 16,
   fontWeight: "normal",
   fontFamily: "sans-serif",
+  letterSpacing: 0,
   textAnchor: "start",
   dominantBaseline: "baseline",
 };
@@ -614,24 +617,9 @@ function renderSVGTextSegmentWithParagraphBuilder(
 ): void {
   const fontCollection = renderer.renderOptions
     .fontCollection as SkiaFontCollection;
-  const fontMgr = fontCollection ? fontCollection.fontMgr : null;
-
-  const ParagraphStyle = (canvasKit as any).ParagraphStyle;
-  const ParagraphBuilder = (canvasKit as any).ParagraphBuilder;
-
-  if (!fontMgr || !ParagraphBuilder || !ParagraphStyle) {
-    canvas.drawText(str, xPos, yPos, paint, font);
-    return;
-  }
-
-  const builderMake =
-    ParagraphBuilder.MakeFromFontProvider ?? ParagraphBuilder.Make;
-  if (!builderMake) {
-    canvas.drawText(str, xPos, yPos, paint, font);
-    return;
-  }
-
+  const fontMgr = fontCollection.fontMgr;
   const fontFamilies: string[] = [];
+
   if (style.fontFamily) {
     style.fontFamily.split(",").forEach((fam) => {
       const cleaned = fam.trim().replace(/^['"]|['"]$/g, "");
@@ -641,49 +629,53 @@ function renderSVGTextSegmentWithParagraphBuilder(
     });
   }
 
-  if (fontCollection && typeof fontCollection.getFamilies === "function") {
-    fontCollection.getFamilies().forEach((fam) => {
-      if (fam && !fontFamilies.includes(fam)) {
-        fontFamilies.push(fam);
-      }
-    });
-  }
+  fontCollection.getFamilies().forEach((fam) => {
+    if (fam && !fontFamilies.includes(fam)) {
+      fontFamilies.push(fam);
+    }
+  });
 
-  let weightNum = 400;
-  if (style.fontWeight === "bold") weightNum = 700;
-  else if (!isNaN(parseFloat(style.fontWeight)))
-    weightNum = parseFloat(style.fontWeight);
+  const weight = mapCSSFontWeightToSkia(style.fontWeight);
+  const slant = mapCSSFontStyleToSkia("normal");
 
-  const paraStyle = new ParagraphStyle({
+  const paraStyle = new canvasKit.ParagraphStyle({
     textStyle: {
       color: paint ? (paint as any).getColor?.() : undefined,
       fontFamilies: fontFamilies.length > 0 ? fontFamilies : undefined,
       fontSize: style.fontSize,
+      letterSpacing:
+        style.letterSpacing &&
+        style.letterSpacing !== 0 &&
+        !isNaN(style.letterSpacing)
+          ? style.letterSpacing
+          : undefined,
       fontStyle: {
-        weight: weightNum,
-        slant: 0,
+        weight: weight,
+        slant: slant,
       },
+    },
+    strutStyle: {
+      fontFamilies: fontFamilies.length > 0 ? fontFamilies : undefined,
+      fontSize: style.fontSize,
+      fontStyle: {
+        weight: weight,
+        slant: slant,
+      },
+      heightMultiplier: 1.0,
+      leading: 0,
+      forceStrutHeight: true,
+      strutEnabled: true,
     },
   });
 
-  const builder = builderMake.call(ParagraphBuilder, paraStyle, fontMgr);
-  if (!builder) {
-    canvas.drawText(str, xPos, yPos, paint, font);
-    paraStyle.delete?.();
-    return;
-  }
-
+  const builder = canvasKit.ParagraphBuilder.MakeFromFontProvider(
+    paraStyle,
+    fontMgr
+  );
   builder.addText(str);
   const paragraph = builder.build();
-  builder.delete?.();
-  paraStyle.delete?.();
+  builder.delete();
 
-  if (!paragraph) {
-    canvas.drawText(str, xPos, yPos, paint, font);
-    return;
-  }
-
-  // Set high layout width so ParagraphBuilder will not wrap text into multiple lines
   paragraph.layout(1000000);
 
   let fontAscent = style.fontSize * 0.8;
@@ -696,42 +688,8 @@ function renderSVGTextSegmentWithParagraphBuilder(
     // fallback
   }
 
-  const lineTopY = yPos - fontAscent;
-  let drawnWithGlyphs = false;
-
-  if (typeof paragraph.getShapedLines === "function") {
-    const shapedLines = paragraph.getShapedLines();
-    if (shapedLines && shapedLines.length > 0) {
-      for (const line of shapedLines) {
-        const lineFont = line.font ?? font;
-        if (
-          typeof canvas.drawGlyphs === "function" &&
-          line.glyphs &&
-          line.positions
-        ) {
-          canvas.drawGlyphs(
-            line.glyphs,
-            line.positions,
-            xPos,
-            lineTopY,
-            lineFont,
-            paint
-          );
-          drawnWithGlyphs = true;
-        }
-      }
-    }
-  }
-
-  if (!drawnWithGlyphs) {
-    if (typeof canvas.drawParagraph === "function") {
-      canvas.drawParagraph(paragraph, xPos, lineTopY);
-    } else {
-      canvas.drawText(str, xPos, yPos, paint, font);
-    }
-  }
-
-  paragraph.delete?.();
+  canvas.drawParagraph(paragraph, xPos, yPos - fontAscent);
+  paragraph.delete();
 }
 
 function computeSVGStyleContext(
@@ -760,6 +718,9 @@ function computeSVGStyleContext(
   const fontSize = parseFloat(getAttr("font-size") ?? `${parent.fontSize}`);
   const fontWeight = getAttr("font-weight") ?? parent.fontWeight;
   const fontFamily = getAttr("font-family") ?? parent.fontFamily;
+  const letterSpacing = parseFloat(
+    getAttr("letter-spacing") ?? `${parent.letterSpacing}`
+  );
   const textAnchor = getAttr("text-anchor") ?? parent.textAnchor;
   const dominantBaseline =
     getAttr("dominant-baseline") ?? parent.dominantBaseline;
@@ -773,6 +734,7 @@ function computeSVGStyleContext(
     fontSize: isNaN(fontSize) ? parent.fontSize : fontSize,
     fontWeight,
     fontFamily,
+    letterSpacing: isNaN(letterSpacing) ? parent.letterSpacing : letterSpacing,
     textAnchor,
     dominantBaseline,
   };
