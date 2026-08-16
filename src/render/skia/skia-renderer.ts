@@ -323,6 +323,7 @@ export class SkiaRenderer {
   renderTextWithParagraphBuilder(
     text: TextBounds,
     letterSpacing: number,
+    _baseline: number,
     paint: SkiaPaint,
     font: SkiaFont,
     styles?: CSSParsedDeclaration
@@ -330,11 +331,8 @@ export class SkiaRenderer {
     const finalFont = text.font ?? font;
     const fontCollection = this.options.fontCollection;
     const fontMgr = fontCollection.fontMgr;
-
-    const ParagraphStyle = this.canvasKit.ParagraphStyle;
-    const ParagraphBuilder = this.canvasKit.ParagraphBuilder;
-
     const fontFamilies: string[] = [];
+
     if (styles?.fontFamily && Array.isArray(styles.fontFamily)) {
       styles.fontFamily.forEach((fam) => {
         if (fam && !fontFamilies.includes(fam)) {
@@ -351,51 +349,46 @@ export class SkiaRenderer {
 
     const weight = styles ? mapCSSFontWeightToSkia(styles.fontWeight) : 400;
     const slant = styles ? mapCSSFontStyleToSkia(styles.fontStyle) : 0;
+    const fontSize = finalFont.getSize();
 
-    const renderSingleString = (str: string, xPos: number): number => {
-      const fontSize =
-        typeof finalFont.getSize === "function" ? finalFont.getSize() : 16;
-      const paraStyle = new ParagraphStyle({
-        textStyle: {
-          color: paint ? (paint as any).getColor?.() : undefined,
-          fontFamilies: fontFamilies.length > 0 ? fontFamilies : undefined,
-          fontSize: fontSize,
-          fontStyle: {
-            weight: weight,
-            slant: slant,
-          },
+    const paraStyle = new this.canvasKit.ParagraphStyle({
+      textStyle: {
+        color: paint ? (paint as any).getColor?.() : undefined,
+        fontFamilies: fontFamilies.length > 0 ? fontFamilies : undefined,
+        fontSize: fontSize,
+        letterSpacing: letterSpacing !== 0 ? letterSpacing : undefined,
+        fontStyle: {
+          weight: weight,
+          slant: slant,
         },
-      });
+      },
+      strutStyle: {
+        fontFamilies: fontFamilies.length > 0 ? fontFamilies : undefined,
+        fontSize: fontSize,
+        fontStyle: {
+          weight: weight,
+          slant: slant,
+        },
+        heightMultiplier: 1.0,
+        leading: 0,
+        forceStrutHeight: true,
+        strutEnabled: true,
+      },
+    });
 
-      const builder = ParagraphBuilder.MakeFromFontProvider(paraStyle, fontMgr);
-      builder.addText(str);
-      const paragraph = builder.build();
-      builder.delete();
+    const builder = this.canvasKit.ParagraphBuilder.MakeFromFontProvider(
+      paraStyle,
+      fontMgr
+    );
+    builder.addText(text.text);
+    const paragraph = builder.build();
+    builder.delete();
 
-      // Set high layout width so ParagraphBuilder will not wrap text into multiple lines
-      paragraph.layout(1000000);
+    // Set high layout width so ParagraphBuilder will not wrap text into multiple lines
+    paragraph.layout(1000000);
 
-      const computedWidth = paragraph.getMaxIntrinsicWidth();
-      this.canvas.drawParagraph(paragraph, xPos, text.bounds.top);
-      paragraph.delete();
-      return computedWidth;
-    };
-
-    if (letterSpacing === 0 || text.text.length === 1) {
-      renderSingleString(text.text, text.bounds.left);
-    } else {
-      const letters = segmentGraphemes(text.text);
-      letters.reduce((left, letter) => {
-        const letterWidth = renderSingleString(letter, left);
-        if (letterWidth > 0) {
-          return left + letterWidth + letterSpacing;
-        }
-        const glyphIDs = finalFont.getGlyphIDs(letter);
-        const widths = finalFont.getGlyphWidths(glyphIDs, paint);
-        const fallbackWidth = widths.length > 0 ? widths[0] : 0;
-        return left + fallbackWidth + letterSpacing;
-      }, text.bounds.left);
-    }
+    this.canvas.drawParagraph(paragraph, text.bounds.left, text.bounds.top);
+    paragraph.delete();
   }
 
   renderTextWithLetterSpacing(
@@ -407,16 +400,15 @@ export class SkiaRenderer {
     styles?: CSSParsedDeclaration
   ): void {
     if (this.options.useParagraphBuilder) {
-      try {
-        this.renderTextWithParagraphBuilder(
-          text,
-          letterSpacing,
-          paint,
-          font,
-          styles
-        );
-        return;
-      } catch (error) {}
+      this.renderTextWithParagraphBuilder(
+        text,
+        letterSpacing,
+        baseline,
+        paint,
+        font,
+        styles
+      );
+      return;
     }
     this.renderStandardText(text, letterSpacing, baseline, paint, font);
   }
