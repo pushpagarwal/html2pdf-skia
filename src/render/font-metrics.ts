@@ -23,7 +23,7 @@ export class FontMetrics {
       try {
         const skMetrics = font.getMetrics();
         const baseline = Math.abs(skMetrics.ascent);
-        const middle = baseline - (font.getSize() / 2);
+        const middle = baseline - font.getSize() / 2;
         return { baseline, middle };
       } catch {
         /* Fallback */

@@ -560,55 +560,55 @@ function processElement(
  * Generate document structure from HTML tree
  */
 export function generateDocumentStructure(htmlElement: Element | Element[]): {
-    structure: PDFTag;
-    tagIdMap: Map<Element, number>;
+  structure: PDFTag;
+  tagIdMap: Map<Element, number>;
 } {
-    const context: DocumentStructureContext = {
-        nextId: 1, // Start from 1, as 0 is reserved for Nothing
-        tagIdMap: new Map()
+  const context: DocumentStructureContext = {
+    nextId: 1, // Start from 1, as 0 is reserved for Nothing
+    tagIdMap: new Map(),
+  };
+
+  // Handle array of elements
+  if (Array.isArray(htmlElement)) {
+    const parentTag: PDFTag = {
+      id: 0,
+      type: PDF_STRUCTURE_TYPES.Document,
+      children: [],
     };
 
-    // Handle array of elements
-    if (Array.isArray(htmlElement)) {
-        const parentTag: PDFTag = {
-            id: 0,
-            type: PDF_STRUCTURE_TYPES.Document,
-            children: [],
-        };
-
-        // Process each element in the array
-        for (const element of htmlElement) {
-            const childTag = processElement(element, context);
-            if (childTag) {
-                parentTag.children?.push(childTag);
-            }
-        }
-
-        return {
-            structure: parentTag,
-            tagIdMap: context.tagIdMap,
-        };
-    }
-
-    // Handle single element (existing logic)
-    const documentStructure = processElement(htmlElement, context);
-
-    // If the root element was skipped, create a minimal document structure
-    if (!documentStructure) {
-        return {
-            structure: {
-                id: 0,
-                type: PDF_STRUCTURE_TYPES.Document,
-                children: [],
-            },
-            tagIdMap: context.tagIdMap,
-        };
+    // Process each element in the array
+    for (const element of htmlElement) {
+      const childTag = processElement(element, context);
+      if (childTag) {
+        parentTag.children?.push(childTag);
+      }
     }
 
     return {
-        structure: documentStructure,
-        tagIdMap: context.tagIdMap,
+      structure: parentTag,
+      tagIdMap: context.tagIdMap,
     };
+  }
+
+  // Handle single element (existing logic)
+  const documentStructure = processElement(htmlElement, context);
+
+  // If the root element was skipped, create a minimal document structure
+  if (!documentStructure) {
+    return {
+      structure: {
+        id: 0,
+        type: PDF_STRUCTURE_TYPES.Document,
+        children: [],
+      },
+      tagIdMap: context.tagIdMap,
+    };
+  }
+
+  return {
+    structure: documentStructure,
+    tagIdMap: context.tagIdMap,
+  };
 }
 
 /**
@@ -625,9 +625,7 @@ export function applyPDFStructureToDocument(document: Document): {
 /**
  * Get PDF tag for specific HTML element
  */
-export function getPDFTagForElement(
-  element: Element,
-): number | undefined {
+export function getPDFTagForElement(element: Element): number | undefined {
   element.getAttribute(PDF_TAG_ATTRIBUTE);
   const match = element.getAttribute(PDF_TAG_ATTRIBUTE)?.match(/(\d+)/);
   return match ? Number(match[1]) : undefined;

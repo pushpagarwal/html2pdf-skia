@@ -46,9 +46,13 @@ export async function renderExperimentalSVG(
   if (!svgElement && typeof container.svg === "string") {
     let svgRaw = container.svg;
     if (svgRaw.startsWith("data:image/svg+xml,")) {
-      svgRaw = decodeURIComponent(svgRaw.substring("data:image/svg+xml,".length));
+      svgRaw = decodeURIComponent(
+        svgRaw.substring("data:image/svg+xml,".length)
+      );
     } else if (svgRaw.startsWith("data:image/svg+xml;utf8,")) {
-      svgRaw = decodeURIComponent(svgRaw.substring("data:image/svg+xml;utf8,".length));
+      svgRaw = decodeURIComponent(
+        svgRaw.substring("data:image/svg+xml;utf8,".length)
+      );
     } else if (svgRaw.startsWith("data:image/svg+xml;base64,")) {
       try {
         svgRaw = atob(svgRaw.substring("data:image/svg+xml;base64,".length));
@@ -66,7 +70,11 @@ export async function renderExperimentalSVG(
     } catch {
       svgElement = null;
     }
-  } else if (!svgElement && container.svg && typeof container.svg === "object") {
+  } else if (
+    !svgElement &&
+    container.svg &&
+    typeof container.svg === "object"
+  ) {
     svgElement = container.svg as SVGElement;
   }
 
@@ -78,7 +86,10 @@ export async function renderExperimentalSVG(
   const viewBoxAttr = svgElement.getAttribute("viewBox");
   let viewBox = { x: 0, y: 0, width: 0, height: 0 };
   if (viewBoxAttr) {
-    const parts = viewBoxAttr.trim().split(/[\s,]+/).map(Number);
+    const parts = viewBoxAttr
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
     if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
       viewBox = { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
     }
@@ -95,7 +106,12 @@ export async function renderExperimentalSVG(
   canvas.translate(containerLeft, containerTop);
 
   // Apply viewBox scaling if available
-  if (viewBox.width > 0 && viewBox.height > 0 && containerWidth > 0 && containerHeight > 0) {
+  if (
+    viewBox.width > 0 &&
+    viewBox.height > 0 &&
+    containerWidth > 0 &&
+    containerHeight > 0
+  ) {
     const scaleX = containerWidth / viewBox.width;
     const scaleY = containerHeight / viewBox.height;
     canvas.scale(scaleX, scaleY);
@@ -189,12 +205,25 @@ function renderRectNode(
   const width = parseFloat(node.getAttribute("width") || "0");
   const height = parseFloat(node.getAttribute("height") || "0");
   const rx = parseFloat(node.getAttribute("rx") || "0");
-  const ry = parseFloat(node.getAttribute("ry") || node.getAttribute("rx") || "0");
+  const ry = parseFloat(
+    node.getAttribute("ry") || node.getAttribute("rx") || "0"
+  );
 
   if (width <= 0 || height <= 0) return;
 
-  const fillPaint = createSVGPaint(canvasKit, style.fill, style.fillOpacity, "fill");
-  const strokePaint = createSVGPaint(canvasKit, style.stroke, style.strokeOpacity, "stroke", style.strokeWidth);
+  const fillPaint = createSVGPaint(
+    canvasKit,
+    style.fill,
+    style.fillOpacity,
+    "fill"
+  );
+  const strokePaint = createSVGPaint(
+    canvasKit,
+    style.stroke,
+    style.strokeOpacity,
+    "stroke",
+    style.strokeWidth
+  );
 
   const rect = canvasKit.LTRBRect(x, y, x + width, y + height);
 
@@ -224,7 +253,13 @@ function renderLineNode(
   const x2 = parseFloat(node.getAttribute("x2") || "0");
   const y2 = parseFloat(node.getAttribute("y2") || "0");
 
-  const strokePaint = createSVGPaint(canvasKit, style.stroke, style.strokeOpacity, "stroke", style.strokeWidth);
+  const strokePaint = createSVGPaint(
+    canvasKit,
+    style.stroke,
+    style.strokeOpacity,
+    "stroke",
+    style.strokeWidth
+  );
   if (!strokePaint) return;
 
   const path = new canvasKit.Path();
@@ -249,7 +284,10 @@ function renderPolygonNode(
   const pointsAttr = node.getAttribute("points");
   if (!pointsAttr) return;
 
-  const coords = pointsAttr.trim().split(/[\s,]+/).map(Number);
+  const coords = pointsAttr
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
   if (coords.length < 4) return;
 
   const path = new canvasKit.Path();
@@ -265,8 +303,16 @@ function renderPolygonNode(
     path.close();
   }
 
-  const fillPaint = close ? createSVGPaint(canvasKit, style.fill, style.fillOpacity, "fill") : null;
-  const strokePaint = createSVGPaint(canvasKit, style.stroke, style.strokeOpacity, "stroke", style.strokeWidth);
+  const fillPaint = close
+    ? createSVGPaint(canvasKit, style.fill, style.fillOpacity, "fill")
+    : null;
+  const strokePaint = createSVGPaint(
+    canvasKit,
+    style.stroke,
+    style.strokeOpacity,
+    "stroke",
+    style.strokeWidth
+  );
 
   try {
     if (fillPaint) canvas.drawPath(path, fillPaint);
@@ -290,8 +336,19 @@ function renderCircleNode(
 
   if (r <= 0) return;
 
-  const fillPaint = createSVGPaint(canvasKit, style.fill, style.fillOpacity, "fill");
-  const strokePaint = createSVGPaint(canvasKit, style.stroke, style.strokeOpacity, "stroke", style.strokeWidth);
+  const fillPaint = createSVGPaint(
+    canvasKit,
+    style.fill,
+    style.fillOpacity,
+    "fill"
+  );
+  const strokePaint = createSVGPaint(
+    canvasKit,
+    style.stroke,
+    style.strokeOpacity,
+    "stroke",
+    style.strokeWidth
+  );
 
   try {
     if (fillPaint) canvas.drawCircle(cx, cy, r, fillPaint);
@@ -316,8 +373,19 @@ function renderEllipseNode(
   if (rx <= 0 || ry <= 0) return;
 
   const rect = canvasKit.LTRBRect(cx - rx, cy - ry, cx + rx, cy + ry);
-  const fillPaint = createSVGPaint(canvasKit, style.fill, style.fillOpacity, "fill");
-  const strokePaint = createSVGPaint(canvasKit, style.stroke, style.strokeOpacity, "stroke", style.strokeWidth);
+  const fillPaint = createSVGPaint(
+    canvasKit,
+    style.fill,
+    style.fillOpacity,
+    "fill"
+  );
+  const strokePaint = createSVGPaint(
+    canvasKit,
+    style.stroke,
+    style.strokeOpacity,
+    "stroke",
+    style.strokeWidth
+  );
 
   try {
     if (fillPaint) canvas.drawOval(rect, fillPaint);
@@ -340,8 +408,19 @@ function renderPathNode(
   const path = canvasKit.Path.MakeFromSVGString(d);
   if (!path) return;
 
-  const fillPaint = createSVGPaint(canvasKit, style.fill, style.fillOpacity, "fill");
-  const strokePaint = createSVGPaint(canvasKit, style.stroke, style.strokeOpacity, "stroke", style.strokeWidth);
+  const fillPaint = createSVGPaint(
+    canvasKit,
+    style.fill,
+    style.fillOpacity,
+    "fill"
+  );
+  const strokePaint = createSVGPaint(
+    canvasKit,
+    style.stroke,
+    style.strokeOpacity,
+    "stroke",
+    style.strokeWidth
+  );
 
   try {
     if (fillPaint) canvas.drawPath(path, fillPaint);
@@ -385,14 +464,26 @@ function renderTextNode(
       if (textVal) {
         segments.push({ text: textVal, style });
       }
-    } else if (child.nodeType === 1 /* Node.ELEMENT_NODE */ && (child as Element).tagName.toLowerCase() === "tspan") {
+    } else if (
+      child.nodeType === 1 /* Node.ELEMENT_NODE */ &&
+      (child as Element).tagName.toLowerCase() === "tspan"
+    ) {
       const tspanEl = child as Element;
       const tspanStyle = computeSVGStyleContext(tspanEl, style);
       const tspanText = tspanEl.textContent || "";
-      const tspanX = tspanEl.hasAttribute("x") ? parseFloat(tspanEl.getAttribute("x")!) : undefined;
-      const tspanY = tspanEl.hasAttribute("y") ? parseFloat(tspanEl.getAttribute("y")!) : undefined;
+      const tspanX = tspanEl.hasAttribute("x")
+        ? parseFloat(tspanEl.getAttribute("x")!)
+        : undefined;
+      const tspanY = tspanEl.hasAttribute("y")
+        ? parseFloat(tspanEl.getAttribute("y")!)
+        : undefined;
       if (tspanText) {
-        segments.push({ text: tspanText, style: tspanStyle, x: tspanX, y: tspanY });
+        segments.push({
+          text: tspanText,
+          style: tspanStyle,
+          x: tspanX,
+          y: tspanY,
+        });
       }
     }
   }
@@ -424,7 +515,10 @@ function renderTextNode(
 
   // Apply dominant-baseline vertical offset
   let baselineY = y;
-  if (style.dominantBaseline === "central" || style.dominantBaseline === "middle") {
+  if (
+    style.dominantBaseline === "central" ||
+    style.dominantBaseline === "middle"
+  ) {
     baselineY += style.fontSize * 0.35;
   } else if (style.dominantBaseline === "hanging") {
     baselineY += style.fontSize * 0.75;
@@ -435,15 +529,67 @@ function renderTextNode(
     const seg = segments[i];
     const width = segmentWidths[i];
     const segX = seg.x !== undefined ? seg.x : currentX;
-    const segY = seg.y !== undefined ? seg.y + (style.dominantBaseline === "central" || style.dominantBaseline === "middle" ? seg.style.fontSize * 0.35 : 0) : baselineY;
+    const segY =
+      seg.y !== undefined
+        ? seg.y +
+          (style.dominantBaseline === "central" ||
+          style.dominantBaseline === "middle"
+            ? seg.style.fontSize * 0.35
+            : 0)
+        : baselineY;
 
-    const fillPaint = createSVGPaint(canvasKit, seg.style.fill, seg.style.fillOpacity, "fill");
-    const strokePaint = createSVGPaint(canvasKit, seg.style.stroke, seg.style.strokeOpacity, "stroke", seg.style.strokeWidth);
+    const fillPaint = createSVGPaint(
+      canvasKit,
+      seg.style.fill,
+      seg.style.fillOpacity,
+      "fill"
+    );
+    const strokePaint = createSVGPaint(
+      canvasKit,
+      seg.style.stroke,
+      seg.style.strokeOpacity,
+      "stroke",
+      seg.style.strokeWidth
+    );
     const font = getSVGSkiaFont(canvasKit, renderer, seg.style);
 
+    const useParagraphBuilder = renderer.renderOptions.useParagraphBuilder;
+
     try {
-      if (fillPaint) canvas.drawText(seg.text, segX, segY, fillPaint, font);
-      if (strokePaint) canvas.drawText(seg.text, segX, segY, strokePaint, font);
+      if (fillPaint) {
+        if (useParagraphBuilder) {
+          renderSVGTextSegmentWithParagraphBuilder(
+            canvasKit,
+            canvas,
+            renderer,
+            seg.text,
+            segX,
+            segY,
+            fillPaint,
+            font,
+            seg.style
+          );
+        } else {
+          canvas.drawText(seg.text, segX, segY, fillPaint, font);
+        }
+      }
+      if (strokePaint) {
+        if (useParagraphBuilder) {
+          renderSVGTextSegmentWithParagraphBuilder(
+            canvasKit,
+            canvas,
+            renderer,
+            seg.text,
+            segX,
+            segY,
+            strokePaint,
+            font,
+            seg.style
+          );
+        } else {
+          canvas.drawText(seg.text, segX, segY, strokePaint, font);
+        }
+      }
     } finally {
       if (fillPaint) fillPaint.delete();
       if (strokePaint) strokePaint.delete();
@@ -455,21 +601,168 @@ function renderTextNode(
   canvas.restore();
 }
 
-function computeSVGStyleContext(node: Element, parent: SVGStyleContext): SVGStyleContext {
+function renderSVGTextSegmentWithParagraphBuilder(
+  canvasKit: CanvasKit,
+  canvas: any,
+  renderer: SkiaRenderer,
+  str: string,
+  xPos: number,
+  yPos: number,
+  paint: Paint,
+  font: Font,
+  style: SVGStyleContext
+): void {
+  const fontCollection = renderer.renderOptions
+    .fontCollection as SkiaFontCollection;
+  const fontMgr = fontCollection ? fontCollection.fontMgr : null;
+
+  const ParagraphStyle = (canvasKit as any).ParagraphStyle;
+  const ParagraphBuilder = (canvasKit as any).ParagraphBuilder;
+
+  if (!fontMgr || !ParagraphBuilder || !ParagraphStyle) {
+    canvas.drawText(str, xPos, yPos, paint, font);
+    return;
+  }
+
+  const builderMake =
+    ParagraphBuilder.MakeFromFontProvider ?? ParagraphBuilder.Make;
+  if (!builderMake) {
+    canvas.drawText(str, xPos, yPos, paint, font);
+    return;
+  }
+
+  const fontFamilies: string[] = [];
+  if (style.fontFamily) {
+    style.fontFamily.split(",").forEach((fam) => {
+      const cleaned = fam.trim().replace(/^['"]|['"]$/g, "");
+      if (cleaned && !fontFamilies.includes(cleaned)) {
+        fontFamilies.push(cleaned);
+      }
+    });
+  }
+
+  if (fontCollection && typeof fontCollection.getFamilies === "function") {
+    fontCollection.getFamilies().forEach((fam) => {
+      if (fam && !fontFamilies.includes(fam)) {
+        fontFamilies.push(fam);
+      }
+    });
+  }
+
+  let weightNum = 400;
+  if (style.fontWeight === "bold") weightNum = 700;
+  else if (!isNaN(parseFloat(style.fontWeight)))
+    weightNum = parseFloat(style.fontWeight);
+
+  const paraStyle = new ParagraphStyle({
+    textStyle: {
+      color: paint ? (paint as any).getColor?.() : undefined,
+      fontFamilies: fontFamilies.length > 0 ? fontFamilies : undefined,
+      fontSize: style.fontSize,
+      fontStyle: {
+        weight: weightNum,
+        slant: 0,
+      },
+    },
+  });
+
+  const builder = builderMake.call(ParagraphBuilder, paraStyle, fontMgr);
+  if (!builder) {
+    canvas.drawText(str, xPos, yPos, paint, font);
+    paraStyle.delete?.();
+    return;
+  }
+
+  builder.addText(str);
+  const paragraph = builder.build();
+  builder.delete?.();
+  paraStyle.delete?.();
+
+  if (!paragraph) {
+    canvas.drawText(str, xPos, yPos, paint, font);
+    return;
+  }
+
+  // Set high layout width so ParagraphBuilder will not wrap text into multiple lines
+  paragraph.layout(1000000);
+
+  let fontAscent = style.fontSize * 0.8;
+  try {
+    const metrics = (font as any).getMetrics?.();
+    if (metrics && metrics.ascent) {
+      fontAscent = Math.abs(metrics.ascent);
+    }
+  } catch {
+    // fallback
+  }
+
+  const lineTopY = yPos - fontAscent;
+  let drawnWithGlyphs = false;
+
+  if (typeof paragraph.getShapedLines === "function") {
+    const shapedLines = paragraph.getShapedLines();
+    if (shapedLines && shapedLines.length > 0) {
+      for (const line of shapedLines) {
+        const lineFont = line.font ?? font;
+        if (
+          typeof canvas.drawGlyphs === "function" &&
+          line.glyphs &&
+          line.positions
+        ) {
+          canvas.drawGlyphs(
+            line.glyphs,
+            line.positions,
+            xPos,
+            lineTopY,
+            lineFont,
+            paint
+          );
+          drawnWithGlyphs = true;
+        }
+      }
+    }
+  }
+
+  if (!drawnWithGlyphs) {
+    if (typeof canvas.drawParagraph === "function") {
+      canvas.drawParagraph(paragraph, xPos, lineTopY);
+    } else {
+      canvas.drawText(str, xPos, yPos, paint, font);
+    }
+  }
+
+  paragraph.delete?.();
+}
+
+function computeSVGStyleContext(
+  node: Element,
+  parent: SVGStyleContext
+): SVGStyleContext {
   const getAttr = (name: string): string | null => {
-    return node.getAttribute(name) || (node as HTMLElement).style?.getPropertyValue(name) || null;
+    return (
+      node.getAttribute(name) ||
+      (node as HTMLElement).style?.getPropertyValue(name) ||
+      null
+    );
   };
 
   const fill = getAttr("fill") ?? parent.fill;
-  const fillOpacity = parseFloat(getAttr("fill-opacity") ?? `${parent.fillOpacity}`);
+  const fillOpacity = parseFloat(
+    getAttr("fill-opacity") ?? `${parent.fillOpacity}`
+  );
   const stroke = getAttr("stroke") ?? parent.stroke;
-  const strokeWidth = parseFloat(getAttr("stroke-width") ?? `${parent.strokeWidth}`);
-  const strokeOpacity = parseFloat(getAttr("stroke-opacity") ?? `${parent.strokeOpacity}`);
+  const strokeWidth = parseFloat(
+    getAttr("stroke-width") ?? `${parent.strokeWidth}`
+  );
+  const strokeOpacity = parseFloat(
+    getAttr("stroke-opacity") ?? `${parent.strokeOpacity}`
+  );
   const fontSize = parseFloat(getAttr("font-size") ?? `${parent.fontSize}`);
   const fontWeight = getAttr("font-weight") ?? parent.fontWeight;
   const fontFamily = getAttr("font-family") ?? parent.fontFamily;
   const textAnchor = getAttr("text-anchor") ?? parent.textAnchor;
-  const dominantBaseline = getAttr("dominant-baseline") ?? parent.dominantBaseline;
+  const dominantBaseline =
+    getAttr("dominant-baseline") ?? parent.dominantBaseline;
 
   return {
     fill,
@@ -492,7 +785,12 @@ function createSVGPaint(
   style: "fill" | "stroke",
   strokeWidth: number = 1.0
 ): Paint | null {
-  if (!colorStr || colorStr === "none" || colorStr === "transparent" || opacity <= 0) {
+  if (
+    !colorStr ||
+    colorStr === "none" ||
+    colorStr === "transparent" ||
+    opacity <= 0
+  ) {
     return null;
   }
 
@@ -532,14 +830,18 @@ function applySVGTransform(canvas: any, transformAttr: string): void {
     const match = /(\w+)\s*\(([^)]+)\)/.exec(t);
     if (!match) continue;
     const type = match[1].toLowerCase();
-    const args = match[2].trim().split(/[\s,]+/).map(Number);
+    const args = match[2]
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
 
     switch (type) {
       case "translate":
         if (args.length >= 1) canvas.translate(args[0], args[1] || 0);
         break;
       case "scale":
-        if (args.length >= 1) canvas.scale(args[0], args[1] !== undefined ? args[1] : args[0]);
+        if (args.length >= 1)
+          canvas.scale(args[0], args[1] !== undefined ? args[1] : args[0]);
         break;
       case "rotate":
         if (args.length >= 1) {
@@ -561,13 +863,20 @@ function getSVGSkiaFont(
   renderer: SkiaRenderer,
   style: SVGStyleContext
 ): Font {
-  const fontCollection = renderer.renderOptions.fontCollection as SkiaFontCollection;
+  const fontCollection = renderer.renderOptions
+    .fontCollection as SkiaFontCollection;
   if (fontCollection && fontCollection.fontMgr) {
     let weightNum = 400;
     if (style.fontWeight === "bold") weightNum = 700;
-    else if (!isNaN(parseFloat(style.fontWeight))) weightNum = parseFloat(style.fontWeight);
+    else if (!isNaN(parseFloat(style.fontWeight)))
+      weightNum = parseFloat(style.fontWeight);
 
-    const families = [style.fontFamily, "Plus Jakarta Sans", "Roboto", "sans-serif"];
+    const families = [
+      style.fontFamily,
+      "Plus Jakarta Sans",
+      "Roboto",
+      "sans-serif",
+    ];
     for (const fam of families) {
       try {
         const typeface = fontCollection.fontMgr.matchFamilyStyle(fam, {

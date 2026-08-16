@@ -157,13 +157,16 @@ export class DocumentCloner {
      * */
     const baseUri = documentClone.baseURI;
     documentClone.open();
-    if (document.doctype && document.doctype.nodeType === Node.DOCUMENT_TYPE_NODE) {
-            const doctypeClone = document.doctype.cloneNode(false);
-            documentClone.append(doctypeClone);
+    if (
+      document.doctype &&
+      document.doctype.nodeType === Node.DOCUMENT_TYPE_NODE
+    ) {
+      const doctypeClone = document.doctype.cloneNode(false);
+      documentClone.append(doctypeClone);
     }
     // Chrome scrolls the parent document for some reason after the write to the cloned window???
     restoreOwnerScroll(this.referenceElement.ownerDocument, scrollX, scrollY);
-  
+
     /**
      * Note: adoptNode() should be called AFTER documentClone.open() and close()
      *

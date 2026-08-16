@@ -6,7 +6,12 @@ import {
   DocumentCloner,
   WindowOptions,
 } from "./dom/document-cloner";
-import { isBodyElement, isHTMLElement, parseBackgroundColor, parseTree } from "./dom/node-parser";
+import {
+  isBodyElement,
+  isHTMLElement,
+  parseBackgroundColor,
+  parseTree,
+} from "./dom/node-parser";
 import { CacheStorage } from "./core/cache-storage";
 import {
   CanvasRenderer,
@@ -169,5 +174,3 @@ const renderElement = async (
   context.logger.debug(`Finished rendering`);
   return canvas;
 };
-
-
