@@ -424,6 +424,10 @@ const options = {
 };
 ```
 
+## 👥 Known Users
+
+- [Kundli Point](https://kundlipoint.com) - Used for generating beautiful Kundli PDF and Horoscope Match Report
+
 ## 📄 License
 
 MIT License - see LICENSE file for details.
